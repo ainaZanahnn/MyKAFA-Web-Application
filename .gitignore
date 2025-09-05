@@ -1,0 +1,49 @@
+﻿# MyKAFA .gitignore - monorepo (React frontend / Express backend)
+
+# Node
+node_modules/
+**/node_modules/
+
+# Frontend build / dev
+/frontend/dist/
+/frontend/build/
+/frontend/.vite/
+# Backend build
+/backend/dist/
+/backend/build/
+
+# Environment / secrets
+.env
+**/.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
+
+# Coverage reports
+coverage/
+*.lcov
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Packages / archives
+*.tgz
+*.zip
+
+# Database/dev artifacts (Prisma/sqlite example)
+prisma/dev.db
+
+# Misc
+out/
