@@ -1,0 +1,186 @@
+/** @format */
+
+"use client";
+
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Edit,
+  Trash2,
+  MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import type { AdaptiveQuizSettings } from '@/lib/AdaptiveQuizEngine';
+
+export interface BlankMapping {
+  blankNumber: number;
+  answerLabel: string;
+}
+
+export interface Item {
+  label: string;
+  text: string;
+  mediaType: string;
+  mediaUrl: string;
+}
+
+export interface Mapping {
+  itemLabel: string;
+  targetLabel: string;
+}
+
+export interface Question {
+  id: number;
+  questionText: string;
+  options: string[];
+  correctAnswers: string[];
+  answerType: string;
+  sentenceWithBlanks: string;
+  answerPool: string[];
+  blankMapping: BlankMapping[];
+  instruction: string;
+  items: Item[];
+  targets: string[];
+  mapping: Mapping[];
+  difficulty?: 'easy' | 'medium' | 'hard';
+  hints?: string[];
+}
+
+export interface QuizData {
+  year: number | null;
+  subject: string;
+  topic: string;
+  quizType: string;
+  bloomLevel: string;
+  questions: Question[];
+  adaptiveSettings: AdaptiveQuizSettings;
+}
+
+interface QuizTableProps {
+  quizzes: QuizData[];
+  onDeleteQuiz?: (index: number) => void;
+  onEditQuiz?: (quiz: QuizData, index: number) => void;
+  currentPage?: number;
+  totalPages?: number;
+  totalQuizzes?: number;
+  onPageChange?: (page: number) => void;
+  itemsPerPage?: number;
+}
+
+export function QuizTable({
+  quizzes,
+  onDeleteQuiz,
+  onEditQuiz,
+  currentPage = 1,
+  totalPages = 1,
+  totalQuizzes = 0,
+  onPageChange,
+  itemsPerPage = 10
+}: QuizTableProps) {
+  return (
+    <div className="bg-card rounded-lg overflow-hidden">
+      <table className="w-full">
+        <thead className="bg-muted/50">
+          <tr>
+            <th className="p-4 text-left">Tahun</th>
+            <th className="p-4 text-left">Mata Pelajaran</th>
+            <th className="p-4 text-left">Topik</th>
+            <th className="p-4 text-left">Jenis</th>
+            <th className="p-4 text-left">Bilangan Kuiz</th>
+            <th className="p-4 text-left">Tindakan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {quizzes.map((quiz, index) => (
+            <tr key={index} className="border-b hover:bg-muted/30">
+              <td className="p-4">{quiz.year || 'N/A'}</td>
+              <td className="p-4">{quiz.subject}</td>
+              <td className="p-4">{quiz.topic}</td>
+              <td className="p-4">{quiz.quizType}</td>
+              <td className="p-4">{quiz.questions.length}</td>
+              <td className="p-4">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => onEditQuiz?.(quiz, index)}>
+                      <Edit className="w-4 h-4 mr-2" /> Sunting Kuiz
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-red-600"
+                      onClick={() => onDeleteQuiz?.(index)}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" /> Padam Kuiz
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between p-4 border-t">
+        <div className="text-sm text-muted-foreground">
+          Menunjukkan {((currentPage - 1) * itemsPerPage) + 1} hingga{" "}
+          {Math.min(currentPage * itemsPerPage, totalQuizzes)} daripada {totalQuizzes}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={currentPage === 1 ? "ghost" : "secondary"}
+            size="sm"
+            disabled={currentPage === 1}
+            onClick={() => onPageChange?.(currentPage - 1)}
+            className={
+              currentPage === 1
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:bg-secondary/80"
+            }
+          >
+            <ChevronLeft /> Sebelum
+          </Button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <Button
+              key={p}
+              variant={p === currentPage ? "default" : "secondary"}
+              size="sm"
+              onClick={() => onPageChange?.(p)}
+              className={
+                p === currentPage
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "hover:bg-secondary/80"
+              }
+            >
+              {p}
+            </Button>
+          ))}
+          <Button
+            variant={currentPage === totalPages ? "ghost" : "secondary"}
+            size="sm"
+            disabled={currentPage === totalPages}
+            onClick={() => onPageChange?.(currentPage + 1)}
+            className={
+              currentPage === totalPages
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:bg-secondary/80"
+            }
+          >
+            Seterusnya <ChevronRight />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
