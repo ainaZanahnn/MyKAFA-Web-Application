@@ -1,9 +1,12 @@
 import { Request, Response } from 'express';
 import pool from '../config/db';
+import { getTopicsBySubjectYear } from '../models/lessonModel';
 
 export const getLessons = async (req: Request, res: Response) => {
   try {
-    const { subject, year_level } = req.query;
+    const { subject, year_level, page = 1, limit = 10 } = req.query;
+
+    const offset = (Number(page) - 1) * Number(limit);
 
     let query = `
       SELECT l.id, l.subject, l.title, l.description, l.year_level as "yearLevel", l.status, l.lesson_order as "order", l.created_at, l.updated_at,
@@ -38,8 +41,28 @@ export const getLessons = async (req: Request, res: Response) => {
 
     query += ` GROUP BY l.id ORDER BY l.lesson_order ASC`;
 
+    // Get total count for pagination
+    const countQuery = `SELECT COUNT(*) as total FROM (${query}) as subquery`;
+    const countResult = await pool.query(countQuery, values);
+    const total = parseInt(countResult.rows[0].total);
+
+    // Add pagination to main query
+    query += ` LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+    values.push(Number(limit), offset);
+
     const result = await pool.query(query, values);
-    res.json(result.rows);
+
+    const totalPages = Math.ceil(total / Number(limit));
+
+    res.json({
+      data: result.rows,
+      pagination: {
+        currentPage: Number(page),
+        totalPages,
+        total,
+        limit: Number(limit)
+      }
+    });
   } catch (error) {
     console.error('Error fetching lessons:', error);
     res.status(500).json({ error: 'Failed to fetch lessons' });
@@ -81,8 +104,15 @@ export const getLessonById = async (req: Request, res: Response) => {
 
 export const createLesson = async (req: Request, res: Response) => {
   try {
-    const { subject, title, description, year_level, status, lesson_order, materials } = req.body;
+    let { subject, title, description, year_level, status, lesson_order, materials } = req.body;
     const files = req.files as Express.Multer.File[];
+
+    // Parse materials if it's sent as FormData (object with numeric keys)
+    if (materials && typeof materials === 'object' && !Array.isArray(materials)) {
+      materials = Object.values(materials);
+    } else if (!materials) {
+      materials = [];
+    }
 
     // Create lesson
     const lessonQuery = `
@@ -295,6 +325,22 @@ export const deleteLesson = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error deleting lesson:', error);
     res.status(500).json({ error: 'Failed to delete lesson' });
+  }
+};
+
+export const getTopics = async (req: Request, res: Response) => {
+  try {
+    const { subject, year_level } = req.query;
+
+    if (!subject || !year_level) {
+      return res.status(400).json({ error: 'Subject and year_level are required' });
+    }
+
+    const topics = await getTopicsBySubjectYear(subject as string, year_level as string);
+    res.json(topics);
+  } catch (error) {
+    console.error('Error fetching topics:', error);
+    res.status(500).json({ error: 'Failed to fetch topics' });
   }
 };
 

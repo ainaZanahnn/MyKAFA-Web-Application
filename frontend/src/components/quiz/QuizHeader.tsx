@@ -7,13 +7,11 @@ interface QuizHeaderProps {
   subject: string;
   topic: string;
   quizType: string;
-  bloomLevel: string;
   availableTopics: string[];
   onYearChange: (year: number | null) => void;
   onSubjectChange: (subject: string) => void;
   onTopicChange: (topic: string) => void;
   onQuizTypeChange: (type: string) => void;
-  onBloomLevelChange: (level: string) => void;
 }
 
 export function QuizHeader({

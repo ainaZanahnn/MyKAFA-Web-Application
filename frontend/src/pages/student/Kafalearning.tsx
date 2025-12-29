@@ -13,63 +13,54 @@ const kafaSubjects = [
   {
     id: 1,
     name: "Al-Quran",
-    nameEn: "Quran",
     icon: "📖",
     color: "from-amber-400 to-orange-500",
   },
   {
     id: 2,
     name: "Akidah",
-    nameEn: "Aqidah",
     icon: "🕌",
     color: "from-sky-400 to-blue-600",
   },
   {
     id: 3,
     name: "Ibadah",
-    nameEn: "Ibadah",
     icon: "🤲",
     color: "from-emerald-400 to-teal-600",
   },
   {
     id: 4,
     name: "Sirah",
-    nameEn: "Sirah",
     icon: "📜",
     color: "from-violet-400 to-purple-600",
   },
   {
     id: 5,
     name: "Adab",
-    nameEn: "Adab",
     icon: "🌟",
     color: "from-rose-400 to-pink-600",
   },
   {
     id: 6,
     name: "Bahasa Arab",
-    nameEn: "Arabic Language",
     icon: "🔤",
     color: "from-yellow-400 to-amber-600",
   },
   {
     id: 7,
     name: "Jawi dan Khat",
-    nameEn: "Jawi and Khat",
     icon: "✍️",
     color: "from-indigo-400 to-indigo-600",
   },
   {
     id: 8,
     name: "Tahfiz al-Quran",
-    nameEn: "Tahfiz Al-Quran",
     icon: "🎵",
     color: "from-lime-400 to-green-500",
   },
   {
     id: 9,
     name: "Test Kuiz Adaptif",
-    nameEn: "Adaptive Quiz Test",
     icon: "🧠",
     color: "from-red-400 to-pink-500",
   },
@@ -116,7 +107,6 @@ interface YearLevel {
 interface Subject {
   id: number;
   name: string;
-  nameEn: string;
   icon: string;
   color: string;
 }
@@ -139,7 +129,7 @@ export function LearningKafa() {
   useEffect(() => {
     const fetchProgress = async () => {
       try {
-        const response = await axios.get('/progress');
+        const response = await axios.get(`/progress?t=${Date.now()}`);
         setProgress(response.data.progress);
 
         // If no progress exists, initialize it
@@ -147,7 +137,7 @@ export function LearningKafa() {
           const registrationYear = parseInt(currentUser?.tahun_darjah || "1");
           await axios.post('/progress/initialize', { registrationYear });
           // Fetch progress again after initialization
-          const updatedResponse = await axios.get('/progress');
+          const updatedResponse = await axios.get(`/progress?t=${Date.now()}`);
           setProgress(updatedResponse.data.progress);
         }
       } catch (error) {
@@ -157,29 +147,30 @@ export function LearningKafa() {
     if (currentUser) fetchProgress();
   }, [currentUser]);
 
-  useEffect(() => {
-    const fetchLessons = async () => {
-      if (selectedYear && selectedSubject) {
-        setLoading(true);
-        try {
-          const response = await axios.get('/lessons', {
-            params: {
-              subject: selectedSubject.name,
-              year_level: `Year ${selectedYear.year}`
-            }
-          });
-          console.log('API Response:', response.data);
-          console.log('Selected subject:', selectedSubject.nameEn);
-          console.log('Selected year level:', `Year ${selectedYear.year}`);
-          setLessons(response.data);
-        } catch (error) {
-          console.error('Error fetching lessons:', error);
-          setLessons([]);
-        } finally {
-          setLoading(false);
-        }
+  const fetchLessons = async () => {
+    if (selectedYear && selectedSubject) {
+      setLoading(true);
+      try {
+        const response = await axios.get('/lessons', {
+          params: {
+            subject: selectedSubject.name,
+            year_level: `Year ${selectedYear.year}`
+          }
+        });
+        console.log('API Response:', response.data);
+        console.log('Selected subject:', selectedSubject.name);
+        console.log('Selected year level:', `Year ${selectedYear.year}`);
+        setLessons(response.data.data || []);
+      } catch (error) {
+        console.error('Error fetching lessons:', error);
+        setLessons([]);
+      } finally {
+        setLoading(false);
       }
-    };
+    }
+  };
+
+  useEffect(() => {
     fetchLessons();
   }, [selectedYear, selectedSubject]);
 
@@ -360,18 +351,18 @@ export function LearningKafa() {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
               <span className="ml-3 text-gray-600">Memuatkan pelajaran...</span>
             </div>
-          ) : selectedSubject.nameEn === "Adaptive Quiz Test" ? (
+          ) : selectedSubject.name === "Test Kuiz Adaptif" ? (
             <TestAdaptiveHints />
           ) : (
             <StudentLessonTable
               lessons={lessons}
               selectedYear={selectedYear.year}
-              selectedSubject={selectedSubject.nameEn}
+              selectedSubject={selectedSubject.name}
               onProgressUpdate={() => {
-                // Refresh progress data
+                // Refresh progress data with cache busting
                 const fetchUpdatedProgress = async () => {
                   try {
-                    const response = await axios.get('/progress');
+                    const response = await axios.get(`/progress?t=${Date.now()}`);
                     setProgress(response.data.progress);
                   } catch (error) {
                     console.error('Error refreshing progress:', error);

@@ -54,18 +54,19 @@ export interface Question {
 }
 
 export interface QuizData {
+  id?: number;
   year: number | null;
   subject: string;
   topic: string;
   quizType: string;
-  bloomLevel: string;
   questions: Question[];
+  questionCount?: number;
   adaptiveSettings: AdaptiveQuizSettings;
 }
 
 interface QuizTableProps {
   quizzes: QuizData[];
-  onDeleteQuiz?: (index: number) => void;
+  onDeleteQuiz?: (id: number) => void;
   onEditQuiz?: (quiz: QuizData, index: number) => void;
   currentPage?: number;
   totalPages?: number;
@@ -84,6 +85,7 @@ export function QuizTable({
   onPageChange,
   itemsPerPage = 10
 }: QuizTableProps) {
+  
   return (
     <div className="bg-card rounded-lg overflow-hidden">
       <table className="w-full">
@@ -104,7 +106,7 @@ export function QuizTable({
               <td className="p-4">{quiz.subject}</td>
               <td className="p-4">{quiz.topic}</td>
               <td className="p-4">{quiz.quizType}</td>
-              <td className="p-4">{quiz.questions.length}</td>
+              <td className="p-4">{quiz.questionCount ?? quiz.questions.length}</td>
               <td className="p-4">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -119,7 +121,7 @@ export function QuizTable({
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-red-600"
-                      onClick={() => onDeleteQuiz?.(index)}
+                      onClick={() => onDeleteQuiz?.(quiz.id!)}
                     >
                       <Trash2 className="w-4 h-4 mr-2" /> Padam Kuiz
                     </DropdownMenuItem>

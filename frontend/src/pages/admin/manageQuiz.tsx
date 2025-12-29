@@ -2,10 +2,10 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ManageQuiz } from "@/components/quiz/ManageQuiz";
 import { QuizTable } from "@/components/admin/quiztable";
-import type { QuizData } from "@/components/admin/quiztable";
+import type { QuizData, Question } from "@/components/admin/quiztable";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -15,171 +15,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { defaultAdaptiveSettings } from "@/lib/quiz-constants";
+import axios from "@/lib/axios";
+import { AxiosError } from "axios";
 
-// Dummy quiz data for demonstration
-const dummyQuizzes: QuizData[] = [
-  {
-    year: 1,
-    subject: "Matematik",
-    topic: "Penambahan Asas",
-    quizType: "mcq",
-    bloomLevel: "Remember",
-    questions: [
-      {
-        id: 1,
-        questionText: "Berapakah 2 + 3?",
-        options: ["4", "5", "6", "7"],
-        correctAnswers: ["Answer2"],
-        answerType: "single",
-        sentenceWithBlanks: "",
-        answerPool: [],
-        blankMapping: [],
-        instruction: "",
-        items: [],
-        targets: [],
-        mapping: []
-      }
-    ],
-    adaptiveSettings: defaultAdaptiveSettings
-  },
-  {
-    year: 2,
-    subject: "Bahasa Melayu",
-    topic: "Tatabahasa",
-    quizType: "mcq",
-    bloomLevel: "Remember",
-    questions: [
-      {
-        id: 2,
-        questionText: "Apakah kata nama?",
-        options: ["Pergi", "Rumah", "Besar", "Cantik"],
-        correctAnswers: ["Answer2"],
-        answerType: "single",
-        sentenceWithBlanks: "",
-        answerPool: [],
-        blankMapping: [],
-        instruction: "",
-        items: [],
-        targets: [],
-        mapping: []
-      }
-    ],
-    adaptiveSettings: defaultAdaptiveSettings
-  },
-  {
-    year: 3,
-    subject: "Sains",
-    topic: "Fizik",
-    quizType: "mcq",
-    bloomLevel: "Application",
-    questions: [
-      {
-        id: 3,
-        questionText: "Apakah Hukum Gerakan Newton yang Pertama?",
-        options: ["Objek yang berehat kekal berehat", "Daya sama dengan jisim darab pecutan", "Untuk setiap tindakan terdapat tindak balas yang sama", "Tenaga tidak boleh dicipta atau dimusnahkan"],
-        correctAnswers: ["Answer1"],
-        answerType: "single",
-        sentenceWithBlanks: "",
-        answerPool: [],
-        blankMapping: [],
-        instruction: "",
-        items: [],
-        targets: [],
-        mapping: []
-      }
-    ],
-    adaptiveSettings: defaultAdaptiveSettings
-  },
-  {
-    year: 4,
-    subject: "Matematik",
-    topic: "Aljabar",
-    quizType: "mcq",
-    bloomLevel: "Understanding",
-    questions: [
-      {
-        id: 4,
-        questionText: "Berapakah nilai x dalam persamaan 2x + 3 = 7?",
-        options: ["x = 2", "x = 3", "x = 4", "x = 5"],
-        correctAnswers: ["Answer1"],
-        answerType: "single",
-        sentenceWithBlanks: "",
-        answerPool: [],
-        blankMapping: [],
-        instruction: "",
-        items: [],
-        targets: [],
-        mapping: []
-      },
-      {
-        id: 5,
-        questionText: "Yang manakah merupakan persamaan kuadratik?",
-        options: ["x + 2 = 0", "x² + 2x + 1 = 0", "2x + 3y = 5", "x³ + 1 = 0"],
-        correctAnswers: ["Answer2", "Answer4"],
-        answerType: "multiple",
-        sentenceWithBlanks: "",
-        answerPool: [],
-        blankMapping: [],
-        instruction: "",
-        items: [],
-        targets: [],
-        mapping: []
-      }
-    ],
-    adaptiveSettings: defaultAdaptiveSettings
-  },
-  {
-    year: 5,
-    subject: "Mathematics",
-    topic: "Calculus",
-    quizType: "mcq",
-    bloomLevel: "Analyze",
-    questions: [
-      {
-        id: 6,
-        questionText: "What is the derivative of x²?",
-        options: ["x", "2x", "x²", "2"],
-        correctAnswers: ["Answer2"],
-        answerType: "single",
-        sentenceWithBlanks: "",
-        answerPool: [],
-        blankMapping: [],
-        instruction: "",
-        items: [],
-        targets: [],
-        mapping: []
-      }
-    ],
-    adaptiveSettings: defaultAdaptiveSettings
-  },
-  {
-    year: 6,
-    subject: "Science",
-    topic: "Advanced Physics",
-    quizType: "mcq",
-    bloomLevel: "Create",
-    questions: [
-      {
-        id: 7,
-        questionText: "Design an experiment to measure gravitational acceleration.",
-        options: ["Use a pendulum", "Drop objects from different heights", "Use a spring scale", "All of the above"],
-        correctAnswers: ["Answer4"],
-        answerType: "single",
-        sentenceWithBlanks: "",
-        answerPool: [],
-        blankMapping: [],
-        instruction: "",
-        items: [],
-        targets: [],
-        mapping: []
-      }
-    ],
-    adaptiveSettings: defaultAdaptiveSettings
-  }
-];
+interface BackendQuiz {
+  id: number;
+  year: number;
+  subject: string;
+  topic: string;
+  status: string;
+  created_at: string;
+}
+
+interface BackendQuestion {
+  id: number;
+  questionText: string;
+  options: string[] | string;
+  correctAnswers: string[] | string;
+  difficulty: string;
+  hints: string[] | string | null;
+}
 
 export default function ManageQuizPage() {
-  const [quizzes, setQuizzes] = useState<QuizData[]>(dummyQuizzes);
+  const [quizzes, setQuizzes] = useState<QuizData[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -187,39 +45,159 @@ export default function ManageQuizPage() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
 
-  const handleSaveQuiz = (quizData: QuizData) => {
-    console.log('Quiz saved:', quizData);
-    // Add to quizzes list
-    setQuizzes([...quizzes, quizData]);
-    setShowCreateForm(false);
+  // Fetch quizzes from API on component mount
+  useEffect(() => {
+    const fetchQuizzes = async () => {
+      try {
+        const response = await axios.get('/admin/quizzes');
+        // Transform backend data to match QuizData interface
+        const transformedQuizzes: QuizData[] = response.data.quizzes.map((quiz: BackendQuiz & { question_count?: number }) => ({
+          id: quiz.id,
+          year: quiz.year,
+          subject: quiz.subject,
+          topic: quiz.topic,
+          quizType: 'mcq', // Default, can be updated based on actual data
+          questions: [], // Will be populated when needed
+          questionCount: quiz.question_count,
+          adaptiveSettings: defaultAdaptiveSettings
+        }));
+        setQuizzes(transformedQuizzes);
+      } catch (error) {
+        console.error('Error fetching quizzes:', error);
+      }
+    };
+
+    fetchQuizzes();
+  }, []);
+
+  const handleSaveQuiz = async (quizData: QuizData) => {
+    try {
+      // Call backend API to create quiz
+      await axios.post('/admin/quizzes', {
+        year: quizData.year,
+        subject: quizData.subject,
+        topic: quizData.topic,
+        quizType: quizData.quizType,
+        questions: quizData.questions
+      });
+
+      // Refresh the quizzes list to get updated question counts
+      const refreshResponse = await axios.get('/admin/quizzes');
+      const transformedQuizzes: QuizData[] = refreshResponse.data.quizzes.map((quiz: BackendQuiz & { question_count?: number }) => ({
+        id: quiz.id,
+        year: quiz.year,
+        subject: quiz.subject,
+        topic: quiz.topic,
+        quizType: 'mcq', // Default, can be updated based on actual data
+        questions: [], // Will be populated when needed
+        questionCount: quiz.question_count,
+        adaptiveSettings: defaultAdaptiveSettings
+      }));
+      setQuizzes(transformedQuizzes);
+
+      setShowCreateForm(false);
+    } catch (error: unknown) {
+      console.error('Error creating quiz:', error);
+
+      // Handle 409 error (quiz already exists)
+      if (error instanceof AxiosError && error.response?.status === 409) {
+        alert('Kuiz untuk topik ini sudah wujud. Sila cari kuiz tersebut dalam jadual dan edit untuk menambah soalan baharu.');
+        return;
+      }
+
+      // Other error - re-throw to let ManageQuiz handle it
+      throw error;
+    }
   };
 
   const handleCancel = () => {
     setShowCreateForm(false);
   };
 
-  const handleDeleteQuiz = (index: number) => {
-    // Placeholder for delete functionality
-    console.log('Delete quiz at index:', index);
-    setQuizzes(quizzes.filter((_, i) => i !== index));
-  };
-
-  const handleEditQuiz = (quiz: QuizData, index: number) => {
-    setEditingQuiz(quiz);
-    setEditingIndex(index);
-    setShowEditForm(true);
-  };
-
-  const handleUpdateQuiz = (quizData: QuizData) => {
-    console.log('Quiz updated:', quizData);
-    if (editingIndex !== null) {
-      const updatedQuizzes = [...quizzes];
-      updatedQuizzes[editingIndex] = quizData;
-      setQuizzes(updatedQuizzes);
+  const handleDeleteQuiz = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this quiz? This action cannot be undone.')) {
+      return;
     }
-    setShowEditForm(false);
-    setEditingQuiz(null);
-    setEditingIndex(null);
+
+    try {
+      await axios.delete(`/admin/quizzes/${id}`);
+      // Remove from local state
+      setQuizzes(quizzes.filter(quiz => quiz.id !== id));
+    } catch (error) {
+      console.error('Error deleting quiz:', error);
+      alert('Failed to delete quiz. Please try again.');
+    }
+  };
+
+  const handleEditQuiz = async (quiz: QuizData, index: number) => {
+    try {
+      // Fetch full quiz data including questions
+      const response = await axios.get(`/admin/quizzes/${quiz.id}`);
+      const fullQuiz = response.data.quiz;
+
+      // Transform backend data to match QuizData interface
+      const transformedQuestions: Question[] = (fullQuiz.questions || []).map((q: BackendQuestion) => ({
+        id: q.id,
+        questionText: q.questionText || '',
+        options: q.options && q.options.length > 0 ? q.options : ['', '', '', ''],
+        correctAnswers: q.correctAnswers || [],
+        answerType: (q.correctAnswers || []).length > 1 ? 'multiple' : 'single',
+        sentenceWithBlanks: '',
+        answerPool: [],
+        blankMapping: [],
+        instruction: '',
+        items: [],
+        targets: [],
+        mapping: [],
+        difficulty: q.difficulty || 'medium',
+        hints: q.hints || []
+      }));
+
+      const transformedQuiz: QuizData = {
+        id: fullQuiz.id,
+        year: fullQuiz.year,
+        subject: fullQuiz.subject,
+        topic: fullQuiz.topic,
+        quizType: fullQuiz.quiz_type || 'mcq',
+        questions: transformedQuestions,
+        questionCount: transformedQuestions.length,
+        adaptiveSettings: defaultAdaptiveSettings
+      };
+
+      setEditingQuiz(transformedQuiz);
+      setEditingIndex(index);
+      setShowEditForm(true);
+    } catch (error) {
+      console.error('Error fetching quiz for editing:', error);
+      alert('Failed to load quiz for editing. Please try again.');
+    }
+  };
+
+  const handleUpdateQuiz = async (quizData: QuizData) => {
+    try {
+      if (editingIndex !== null && quizzes[editingIndex].id) {
+        // Call backend API to update quiz
+        await axios.put(`/admin/quizzes/${quizzes[editingIndex].id}`, {
+          year: quizData.year,
+          subject: quizData.subject,
+          topic: quizData.topic,
+          quizType: quizData.quizType,
+          status: 'draft', // Default status
+          questions: quizData.questions
+        });
+
+        // Update local state
+        const updatedQuizzes = [...quizzes];
+        updatedQuizzes[editingIndex] = quizData;
+        setQuizzes(updatedQuizzes);
+      }
+      setShowEditForm(false);
+      setEditingQuiz(null);
+      setEditingIndex(null);
+    } catch (error) {
+      console.error('Error updating quiz:', error);
+      throw error; // Re-throw to let ManageQuiz handle it
+    }
   };
 
   const handleCancelEdit = () => {

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -25,17 +26,25 @@ import type { Lesson } from "@/components/admin/lessontable";
 import { Textarea } from "@/components/ui/textarea";
 import axios from "@/lib/axios";
 import { toast } from "react-toastify";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
+// Define subject type
+type Subject = {
+  id: number;
+  name: string;
+  icon: string;
+  color: string;
+};
 
-const kafaSubjects = [
-  { id: 1, name: "Al-Quran", nameEn: "Quran", icon: "📖", color: "bg-blue-500" },
-  { id: 2, name: "Akidah", nameEn: "Aqidah", icon: "🕌", color: "bg-green-500" },
-  { id: 3, name: "Ibadah", nameEn: "Ibadah", icon: "🤲", color: "bg-purple-500" },
-  { id: 4, name: "Sirah", nameEn: "Sirah", icon: "📚", color: "bg-orange-500" },
-  { id: 5, name: "Adab", nameEn: "Adab", icon: "🌟", color: "bg-pink-500" },
-  { id: 6, name: "Bahasa Arab", nameEn: "Arabic Language", icon: "🔤", color: "bg-red-500" },
-  { id: 7, name: "Jawi dan Khat", nameEn: "Jawi and Khat", icon: "✍️", color: "bg-indigo-500" },
-  { id: 8, name: "Tahfiz al-Quran", nameEn: "Tahfiz Al-Quran", icon: "🎵", color: "bg-teal-500" },
+const kafaSubjects: Subject[] = [
+  { id: 1, name: "Al-Quran", icon: "📖", color: "bg-blue-500" },
+  { id: 2, name: "Akidah", icon: "🕌", color: "bg-green-500" },
+  { id: 3, name: "Ibadah", icon: "🤲", color: "bg-purple-500" },
+  { id: 4, name: "Sirah", icon: "📚", color: "bg-orange-500" },
+  { id: 5, name: "Adab", icon: "🌟", color: "bg-pink-500" },
+  { id: 6, name: "Bahasa Arab", icon: "🔤", color: "bg-red-500" },
+  { id: 7, name: "Jawi dan Khat", icon: "✍️", color: "bg-indigo-500" },
+  { id: 8, name: "Tahfiz al-Quran", icon: "🎵", color: "bg-teal-500" },
 ];
 
 const yearLevels = ["Tahun 1", "Tahun 2", "Tahun 3", "Tahun 4", "Tahun 5", "Tahun 6"];
@@ -59,21 +68,16 @@ const reverseYearMapping = {
 };
 
 export function LearningModuleManagement() {
-  // Define subject type
-  type Subject = {
-    id: number;
-    name: string;
-    nameEn: string;
-    icon: string;
-    color: string;
-  };
-
   // Start with default selections
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null); // Default to "All" subjects
   const [selectedYear, setSelectedYear] = useState<string>("Tahun 1"); // Default to Tahun 1
   const [isAddLessonOpen, setIsAddLessonOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalLessons, setTotalLessons] = useState(0);
+  const itemsPerPage = 5;
 
   // Form state variables
   const [dialogYear, setDialogYear] = useState<string>(selectedYear);
@@ -84,22 +88,24 @@ export function LearningModuleManagement() {
   const [materials, setMaterials] = useState<Array<{ type: string; title: string; file?: File; link?: string }>>([]);
   const [lessonOrder, setLessonOrder] = useState<number>(0);
 
-  // Fetch lessons when year or subject changes
+  // Fetch lessons when year, subject, or page changes
   useEffect(() => {
     const fetchLessons = async () => {
       try {
         const englishYear = yearMapping[selectedYear as keyof typeof yearMapping] || selectedYear;
-        let url = `lessons?year_level=${englishYear}`;
+        let url = `lessons?year_level=${englishYear}&page=${currentPage}&limit=${itemsPerPage}`;
         if (selectedSubject) {
           url += `&subject=${selectedSubject.name}`;
         }
         const response = await axios.get(url);
         // Map yearLevel back to Malay for display
-        const mappedLessons = response.data.map((lesson: Lesson) => ({
+        const mappedLessons = response.data.data.map((lesson: Lesson) => ({
           ...lesson,
           yearLevel: reverseYearMapping[lesson.yearLevel as keyof typeof reverseYearMapping] || lesson.yearLevel
         }));
         setLessons(mappedLessons);
+        setTotalPages(response.data.pagination.totalPages);
+        setTotalLessons(response.data.pagination.total);
       } catch (error) {
         console.error('Error fetching lessons:', error);
         toast.error('Gagal memuatkan pelajaran');
@@ -109,7 +115,7 @@ export function LearningModuleManagement() {
     if (selectedYear) {
       fetchLessons();
     }
-  }, [selectedYear, selectedSubject]);
+  }, [selectedYear, selectedSubject, currentPage]);
 
   const updateLessonStatus = async (lessonId: number, newStatus: string) => {
     try {
@@ -144,7 +150,7 @@ export function LearningModuleManagement() {
       const formData = new FormData();
 
                         // Add lesson data
-                        formData.append('subject', dialogSubject.nameEn);
+                        formData.append('subject', dialogSubject.name);
       formData.append('title', lessonTitle);
       formData.append('description', lessonDescription);
       formData.append('year_level', yearMapping[dialogYear as keyof typeof yearMapping] || dialogYear);
@@ -207,7 +213,10 @@ export function LearningModuleManagement() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <Select value={selectedYear} onValueChange={(value) => {
+                  setSelectedYear(value);
+                  setCurrentPage(1); // Reset to first page when year changes
+                }}>
                 <SelectTrigger className="w-[120px] bg-white/10 border-white/20 text-white"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {yearLevels.map((year) => (
@@ -226,6 +235,7 @@ export function LearningModuleManagement() {
                     const subject = kafaSubjects.find(s => s.name === value);
                     if (subject) setSelectedSubject(subject);
                   }
+                  setCurrentPage(1); // Reset to first page when subject changes
                 }} >
                 <SelectTrigger className="w-[180px] bg-white/10 border-white/20 text-white"> <SelectValue /> </SelectTrigger>
                 <SelectContent>
@@ -246,9 +256,12 @@ export function LearningModuleManagement() {
                   + Tambah Pelajaran
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg">
+              <DialogContent className="max-w-lg" aria-describedby="add-lesson-description">
                 <DialogHeader>
                   <DialogTitle className="mb-4"><center>Tambah Pelajaran Baru</center></DialogTitle>
+                  <DialogDescription id="add-lesson-description">
+                    Isi borang di bawah untuk menambah pelajaran baru ke dalam sistem.
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -414,7 +427,7 @@ export function LearningModuleManagement() {
                       type="number"
                       placeholder="Susunan (pilihan)"
                       value={lessonOrder}
-                      onChange={(e) => setLessonOrder(Number(e.target.value))}
+                      onChange={(e) => setLessonOrder(parseInt(e.target.value) || 0)}
                     />
                   </div>
                   <div className="flex justify-end gap-2">
@@ -426,7 +439,7 @@ export function LearningModuleManagement() {
                         const formData = new FormData();
 
                         // Add lesson data
-                        formData.append('subject', dialogSubject.nameEn);
+                        formData.append('subject', dialogSubject.name);
                         formData.append('title', lessonTitle);
                         formData.append('description', lessonDescription);
                         formData.append('year_level', yearMapping[dialogYear as keyof typeof yearMapping] || dialogYear);
@@ -475,9 +488,12 @@ export function LearningModuleManagement() {
             </Dialog>
 
             <Dialog open={!!editingLesson} onOpenChange={(open) => !open && setEditingLesson(null)}>
-              <DialogContent className="max-w-lg">
+              <DialogContent className="max-w-lg" aria-describedby="edit-lesson-description">
                 <DialogHeader>
                   <DialogTitle className="mb-4"><center>Edit Pelajaran</center></DialogTitle>
+                  <DialogDescription id="edit-lesson-description">
+                    Kemaskini maklumat pelajaran yang dipilih.
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -643,7 +659,7 @@ export function LearningModuleManagement() {
                       type="number"
                       placeholder="Susunan (pilihan)"
                       value={lessonOrder}
-                      onChange={(e) => setLessonOrder(Number(e.target.value))}
+                      onChange={(e) => setLessonOrder(parseInt(e.target.value) || 0)}
                     />
                   </div>
                   <div className="flex justify-end gap-2">
@@ -679,6 +695,55 @@ export function LearningModuleManagement() {
               }
             }}
           />
+
+          {/* Pagination */}
+          {totalLessons > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200 shadow-sm">
+              <div className="flex items-center text-sm text-gray-700">
+                <span>
+                  Menunjukkan {((currentPage - 1) * itemsPerPage) + 1} hingga {Math.min(currentPage * itemsPerPage, totalLessons)} daripada {totalLessons} pelajaran
+                </span>
+                <span className="ml-4 text-xs text-gray-500">
+                  (Halaman {currentPage} daripada {totalPages})
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Sebelumnya
+                </Button>
+
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className="w-8 h-8 p-0"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                >
+                  Seterusnya
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
     </div>
   );

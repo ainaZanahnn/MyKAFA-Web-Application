@@ -30,7 +30,7 @@ app.use("/api/upkk", upkkRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/progress", progressRoutes);
 app.use("/api/lessons", lessonRoutes);
-app.use("/api/admin/quizzes", quizRoutes);
+app.use("/api", quizRoutes);
 //app.use("/api", authRoutes);
 
 // Basic route for testing

@@ -188,3 +188,18 @@ export const getLessonWithMaterialsById = async (id: number) => {
   const result = await pool.query(query, [id]);
   return result.rows[0];
 };
+
+/* -------------------------------------------------------------------
+   GET DISTINCT TOPICS (TITLES) BY SUBJECT AND YEAR LEVEL
+------------------------------------------------------------------- */
+export const getTopicsBySubjectYear = async (subject: string, year_level: string) => {
+  const query = `
+    SELECT DISTINCT title as topic
+    FROM lessons
+    WHERE subject = $1 AND year_level = $2 AND status = 'Published'
+    ORDER BY title ASC
+  `;
+
+  const result = await pool.query(query, [subject, year_level]);
+  return result.rows.map(row => row.topic);
+};

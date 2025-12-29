@@ -4,9 +4,10 @@ CREATE TABLE IF NOT EXISTS quizzes (
     year INTEGER NOT NULL CHECK (year >= 1 AND year <= 6),
     subject VARCHAR(100) NOT NULL,
     topic VARCHAR(255) NOT NULL,
-    bloom_level VARCHAR(20) NOT NULL CHECK (bloom_level IN ('remember', 'understand', 'apply', 'analyze')),
+    quiz_type VARCHAR(50) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create quiz_templates table
@@ -23,8 +24,10 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
     quiz_id INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
     question TEXT NOT NULL,
     options JSONB NOT NULL, -- Array of 4 options stored as JSON
-    correct_answer INTEGER NOT NULL CHECK (correct_answer >= 0 AND correct_answer <= 3),
+    correct_answers JSONB NOT NULL, -- Array of correct answers stored as JSON
     hints JSONB, -- Array of hints stored as JSON
+    difficulty VARCHAR(20) DEFAULT 'medium', -- Difficulty level
+    topic VARCHAR(255), -- Topic of the question
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

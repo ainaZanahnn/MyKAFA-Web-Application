@@ -23,6 +23,9 @@ export interface MergedProgress {
    GET ALL MERGED PROGRESS FOR USER
 ------------------------------------------------------------------- */
 export const getMergedUserProgress = async (user_id: number) => {
+  // First, ensure all published lessons have progress records for this user
+  await ensureAllLessonsHaveProgress(user_id);
+
   const lessons = await pool.query(
     `SELECT * FROM student_progress WHERE user_id = $1 ORDER BY year, subject, topic`,
     [user_id]
@@ -89,6 +92,70 @@ export const getMergedUserProgress = async (user_id: number) => {
 };
 
 /* -------------------------------------------------------------------
+   ENSURE ALL PUBLISHED LESSONS HAVE PROGRESS RECORDS
+------------------------------------------------------------------- */
+export const ensureAllLessonsHaveProgress = async (user_id: number) => {
+  // Get all published lessons
+  const publishedLessons = await pool.query(
+    `SELECT subject, title, year_level FROM lessons WHERE status = 'Published' ORDER BY year_level, subject, lesson_order`
+  );
+
+  // Group lessons by year and subject
+  const lessonsByYearSubject: { [key: string]: string[] } = {};
+
+  publishedLessons.rows.forEach((lesson: any) => {
+    // Extract year number from year_level (e.g., "Year 1" -> 1)
+    const yearMatch = lesson.year_level.match(/(\d+)/);
+    const year = yearMatch ? parseInt(yearMatch[1]) : 1;
+    const subject = lesson.subject;
+    const key = `${year}-${subject}`;
+
+    if (!lessonsByYearSubject[key]) {
+      lessonsByYearSubject[key] = [];
+    }
+    lessonsByYearSubject[key].push(lesson.title);
+  });
+
+  // Ensure progress records exist for each lesson
+  for (const [key, topics] of Object.entries(lessonsByYearSubject)) {
+    const [yearStr, subject] = key.split('-');
+    const year = parseInt(yearStr);
+
+    for (const topic of topics) {
+      // Check if lesson progress already exists
+      const existingLessonProgress = await pool.query(
+        `SELECT id FROM student_progress WHERE user_id = $1 AND year = $2 AND subject = $3 AND topic = $4`,
+        [user_id, year, subject, topic]
+      );
+
+      if (existingLessonProgress.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO student_progress
+           (user_id, year, subject, topic, lesson_completed, materials_viewed)
+           VALUES ($1, $2, $3, $4, false, '[]')`,
+          [user_id, year, subject, topic]
+        );
+      }
+
+      // Check if quiz progress already exists
+      const existingQuizProgress = await pool.query(
+        `SELECT id FROM student_quiz_progress WHERE user_id = $1 AND year = $2 AND subject = $3 AND topic = $4`,
+        [user_id, year, subject, topic]
+      );
+
+      if (existingQuizProgress.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO student_quiz_progress
+           (user_id, year, subject, topic, total_attempts, best_score, last_score, passed)
+           VALUES ($1, $2, $3, $4, 0, 0, 0, false)`,
+          [user_id, year, subject, topic]
+        );
+      }
+    }
+  }
+};
+
+/* -------------------------------------------------------------------
    COMPLETE LESSON TOPIC
 ------------------------------------------------------------------- */
 export const completeLessonTopic = async (
@@ -138,8 +205,8 @@ export const updateQuizProgress = async (
   } else {
     await pool.query(
       `INSERT INTO student_quiz_progress
-       (user_id, year, subject, topic, last_score, passed)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+       (user_id, year, subject, topic, total_attempts, best_score, last_score, passed)
+       VALUES ($1, $2, $3, $4, 1, $5, $5, $6)`,
       [user_id, year, subject, topic, score, passed]
     );
   }
@@ -206,8 +273,8 @@ export const initializeMergedProgress = async (
       if (existingQuizProgress.rows.length === 0) {
         await pool.query(
           `INSERT INTO student_quiz_progress
-           (user_id, year, subject, topic, difficulty_level)
-           VALUES ($1, $2, $3, $4, 'normal')`,
+           (user_id, year, subject, topic, passed)
+           VALUES ($1, $2, $3, $4, false)`,
           [user_id, year, subject, topic]
         );
       }
@@ -225,15 +292,46 @@ export const markMaterialViewed = async (
   topic: string,
   materialId: number
 ) => {
-  // First, get the current materials_viewed array
-  const currentProgress = await pool.query(
+  // Ensure progress record exists first
+  await ensureAllLessonsHaveProgress(user_id);
+
+  // Check if progress record exists, if not create it
+  let currentProgress = await pool.query(
     `SELECT materials_viewed FROM student_progress
      WHERE user_id = $1 AND year = $2 AND subject = $3 AND topic = $4`,
     [user_id, year, subject, topic]
   );
 
   if (currentProgress.rows.length === 0) {
-    throw new Error('Progress record not found');
+    // Create the progress record if it doesn't exist
+    await pool.query(
+      `INSERT INTO student_progress
+       (user_id, year, subject, topic, lesson_completed, materials_viewed)
+       VALUES ($1, $2, $3, $4, false, '[]')`,
+      [user_id, year, subject, topic]
+    );
+
+    // Also create quiz progress if it doesn't exist
+    const existingQuizProgress = await pool.query(
+      `SELECT id FROM student_quiz_progress WHERE user_id = $1 AND year = $2 AND subject = $3 AND topic = $4`,
+      [user_id, year, subject, topic]
+    );
+
+    if (existingQuizProgress.rows.length === 0) {
+      await pool.query(
+        `INSERT INTO student_quiz_progress
+         (user_id, year, subject, topic, total_attempts, best_score, last_score, passed)
+         VALUES ($1, $2, $3, $4, 0, 0, 0, false)`,
+        [user_id, year, subject, topic]
+      );
+    }
+
+    // Now fetch the newly created record
+    currentProgress = await pool.query(
+      `SELECT materials_viewed FROM student_progress
+       WHERE user_id = $1 AND year = $2 AND subject = $3 AND topic = $4`,
+      [user_id, year, subject, topic]
+    );
   }
 
   const currentMaterials = currentProgress.rows[0].materials_viewed || [];

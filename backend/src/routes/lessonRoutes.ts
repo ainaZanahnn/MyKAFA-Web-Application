@@ -10,6 +10,7 @@ import {
   updateLessonStatus,
   deleteLesson,
   viewMaterial,
+  getTopics,
 } from "../controllers/lessonController";
 
 // Configure multer for file uploads
@@ -29,6 +30,7 @@ const router = express.Router();
 
 // Student routes - require authentication but not admin role
 router.get("/", protect, getLessons);
+router.get("/topics", protect, getTopics);
 router.get("/:id", protect, getLessonById);
 router.get("/:id/materials/:materialId/view", protect, viewMaterial);
 

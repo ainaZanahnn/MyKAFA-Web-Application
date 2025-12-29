@@ -6,11 +6,11 @@ import { QuestionCard } from './QuestionCard';
 import { AdaptiveSettings } from './AdaptiveSettings';
 import type { AdaptiveQuizSettings } from '@/lib/AdaptiveQuizEngine';
 import { defaultAdaptiveSettings } from '@/lib/quiz-constants';
-import { MOCK_TOPICS_DATABASE } from '@/lib/quiz-config';
 import type { QuizData, Question } from '@/components/admin/quiztable';
+import axios from '@/lib/axios';
 
 interface ManageQuizProps {
-  onSave: (quizData: QuizData) => void;
+  onSave: (quizData: QuizData) => Promise<void>;
   onCancel: () => void;
   initialQuiz?: QuizData;
   isEditing?: boolean;
@@ -20,27 +20,71 @@ export function ManageQuiz({ onSave, onCancel, initialQuiz, isEditing }: ManageQ
   const [year, setYear] = useState<number | null>(null);
   const [subject, setSubject] = useState('');
   const [topic, setTopic] = useState('');
-  const [quizType, setQuizType] = useState('');
-  const [bloomLevel, setBloomLevel] = useState('');
+
   const [questions, setQuestions] = useState<Question[]>([]);
   const [activeTab, setActiveTab] = useState<'questions' | 'adaptive'>('questions');
   const [adaptiveSettings, setAdaptiveSettings] = useState<AdaptiveQuizSettings>(defaultAdaptiveSettings);
+  const [availableTopics, setAvailableTopics] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (initialQuiz) {
       setYear(initialQuiz.year);
       setSubject(initialQuiz.subject);
       setTopic(initialQuiz.topic);
-      setQuizType(initialQuiz.quizType);
-      setBloomLevel(initialQuiz.bloomLevel);
       setQuestions(initialQuiz.questions);
       setAdaptiveSettings(initialQuiz.adaptiveSettings || defaultAdaptiveSettings);
     }
   }, [initialQuiz]);
 
-  const availableTopics = year && subject
-    ? MOCK_TOPICS_DATABASE.find(db => db.year === year && db.subject === subject)?.topics || []
-    : [];
+  // Fetch available topics when subject or year changes
+  useEffect(() => {
+    const fetchTopics = async () => {
+      if (year && subject) {
+        try {
+          const englishYear = `Year ${year}`;
+          const response = await axios.get(`lessons/topics?subject=${subject}&year_level=${englishYear}`);
+          setAvailableTopics(response.data);
+        } catch (error) {
+          console.error('Error fetching topics:', error);
+          setAvailableTopics([]);
+        }
+      } else {
+        setAvailableTopics([]);
+      }
+    };
+
+    fetchTopics();
+  }, [year, subject]);
+
+  // Filter available topics to exclude those that already have quizzes
+  const [existingQuizTopics, setExistingQuizTopics] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchExistingQuizTopics = async () => {
+      if (year && subject && !isEditing) {
+        try {
+          const response = await axios.get('/admin/quizzes');
+          const existingTopics = response.data.quizzes
+            .filter((quiz: { year: number; subject: string; topic: string }) =>
+              quiz.year === year && quiz.subject === subject
+            )
+            .map((quiz: { year: number; subject: string; topic: string }) => quiz.topic);
+          setExistingQuizTopics(existingTopics);
+        } catch (error) {
+          console.error('Error fetching existing quiz topics:', error);
+          setExistingQuizTopics([]);
+        }
+      } else {
+        setExistingQuizTopics([]);
+      }
+    };
+
+    fetchExistingQuizTopics();
+  }, [year, subject, isEditing]);
+
+  // Filter available topics to exclude those with existing quizzes
+  const filteredAvailableTopics = availableTopics.filter(topic => !existingQuizTopics.includes(topic));
 
   const handleAddQuestion = () => {
     const newQuestion: Question = {
@@ -69,22 +113,23 @@ export function ManageQuiz({ onSave, onCancel, initialQuiz, isEditing }: ManageQ
     setQuestions(questions.map(q => q.id === id ? { ...q, [field]: value } : q));
   };
 
-
-
-  const handleSave = () => {
-    const quizData: QuizData = {
-      year,
-      subject,
-      topic,
-      quizType,
-      bloomLevel,
-      questions,
-      adaptiveSettings
-    };
-    onSave(quizData);
+  const handleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      const quizData: QuizData = {
+        year,
+        subject,
+        topic,
+        quizType: 'mcq', // Default quiz type
+        questions,
+        adaptiveSettings
+      };
+      await onSave(quizData);
+    } finally {
+      setIsSaving(false);
+    }
   };
-
-
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8">
@@ -96,8 +141,8 @@ export function ManageQuiz({ onSave, onCancel, initialQuiz, isEditing }: ManageQ
           <Button variant="outline" onClick={onCancel}>
             Batal
           </Button>
-          <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700">
-            {isEditing ? "Kemaskini Kuiz" : "Simpan Kuiz"}
+          <Button onClick={handleSave} disabled={isSaving} className="bg-green-600 hover:bg-green-700">
+            {isSaving ? "Menyimpan..." : (isEditing ? "Kemaskini Kuiz" : "Simpan Kuiz")}
           </Button>
         </div>
       </div>
@@ -106,18 +151,15 @@ export function ManageQuiz({ onSave, onCancel, initialQuiz, isEditing }: ManageQ
         year={year}
         subject={subject}
         topic={topic}
-        quizType={quizType}
-        bloomLevel={bloomLevel}
-        availableTopics={availableTopics}
+        quizType={'mcq'}
+        availableTopics={filteredAvailableTopics}
         onYearChange={setYear}
         onSubjectChange={setSubject}
         onTopicChange={setTopic}
-        onQuizTypeChange={setQuizType}
-        onBloomLevelChange={setBloomLevel}
+        onQuizTypeChange={() => {}}
       />
 
-      {quizType && (
-        <div className="space-y-6">
+      <div className="space-y-6">
           {/* Tab Navigation */}
           <div className="flex border-b border-slate-200">
             <button
@@ -165,7 +207,7 @@ export function ManageQuiz({ onSave, onCancel, initialQuiz, isEditing }: ManageQ
                   key={question.id}
                   question={question}
                   index={index}
-                  quizType={quizType}
+                  quizType={'mcq'}
                   onRemoveQuestion={handleRemoveQuestion}
                   onUpdateQuestion={handleUpdateQuestion}
                 />
@@ -182,9 +224,8 @@ export function ManageQuiz({ onSave, onCancel, initialQuiz, isEditing }: ManageQ
                 onSettingsChange={setAdaptiveSettings}
               />
             </div>
-          )}a
+          )}
         </div>
-      )}
     </div>
   );
 }

@@ -5,16 +5,16 @@ interface QuizQuestion {
   id: number;
   question: string;
   options: string[];
-  correct_answer: number;
-  explanation: string;
+  correct_answers: string[];
 }
 
 interface Quiz {
   id: number;
+  title: string;
+  description: string;
   year: number;
   subject: string;
   topic: string;
-  bloom_level: 'remember' | 'understand' | 'apply' | 'analyze';
   status: 'draft' | 'published' | 'archived';
   created_at: string;
 }
@@ -22,38 +22,20 @@ interface Quiz {
 // GET /api/admin/quizzes - Get all quizzes
 export const getQuizzes = async (req: Request, res: Response) => {
   try {
-    // Return dummy data for now
-    const dummyQuizzes: Quiz[] = [
-      {
-        id: 1,
-        year: 1,
-        subject: "Al-Quran",
-        topic: "Basic Knowledge",
-        bloom_level: "remember",
-        status: "published",
-        created_at: "2024-01-15T10:00:00Z"
-      },
-      {
-        id: 2,
-        year: 2,
-        subject: "Ibadah",
-        topic: "Islamic Prayer",
-        bloom_level: "understand",
-        status: "draft",
-        created_at: "2024-01-20T14:30:00Z"
-      },
-      {
-        id: 3,
-        year: 3,
-        subject: "Bahasa Arab",
-        topic: "Arabic Alphabet",
-        bloom_level: "apply",
-        status: "published",
-        created_at: "2024-01-25T09:15:00Z"
-      }
-    ];
+    // Fetch quizzes from database with question count
+    const query = `
+      SELECT q.id, q.year, q.subject, q.topic, q.quiz_type, q.status, q.created_at,
+             COUNT(qq.id) as question_count
+      FROM quizzes q
+      LEFT JOIN quiz_questions qq ON q.id = qq.quiz_id
+      GROUP BY q.id, q.year, q.subject, q.topic, q.quiz_type, q.status, q.created_at
+      ORDER BY q.created_at DESC
+    `;
 
-    res.json({ quizzes: dummyQuizzes });
+    const result = await pool.query(query);
+    const quizzes = result.rows;
+
+    res.json({ quizzes });
   } catch (error) {
     console.error('Error fetching quizzes:', error);
     res.status(500).json({ error: 'Failed to fetch quizzes' });
@@ -62,18 +44,56 @@ export const getQuizzes = async (req: Request, res: Response) => {
 
 // POST /api/admin/quizzes - Create a new quiz
 export const createQuiz = async (req: Request, res: Response) => {
-  const { year, subject, topic, bloom_level } = req.body;
+  const { year, subject, topic, quizType, questions } = req.body;
+
+  // Validation
+  if (!year || !subject || !topic || !quizType) {
+    return res.status(400).json({ error: 'Year, subject, topic, and quizType are required' });
+  }
+
+  if (year < 1 || year > 6) {
+    return res.status(400).json({ error: 'Year must be between 1 and 6' });
+  }
 
   try {
+    // Check if quiz already exists
+    const checkQuery = `
+      SELECT id FROM quizzes WHERE year = $1 AND subject = $2 AND topic = $3
+    `;
+    const checkResult = await pool.query(checkQuery, [year, subject, topic]);
+    if (checkResult.rows.length > 0) {
+      return res.status(409).json({ error: 'A quiz for this year, subject, and topic already exists' });
+    }
+
     // Insert quiz
     const quizQuery = `
-      INSERT INTO quizzes (year, subject, topic, bloom_level, status, created_at)
+      INSERT INTO quizzes (year, subject, topic, quiz_type, status, created_at)
       VALUES ($1, $2, $3, $4, 'draft', NOW())
       RETURNING id
     `;
 
-    const quizResult = await pool.query(quizQuery, [year, subject, topic, bloom_level]);
+    const quizResult = await pool.query(quizQuery, [year, subject, topic, quizType || 'mcq']);
     const quizId = quizResult.rows[0].id;
+
+    // Insert questions if provided
+    if (questions && questions.length > 0) {
+      for (const question of questions) {
+        const questionQuery = `
+          INSERT INTO quiz_questions (quiz_id, question, options, correct_answers, hints, difficulty, topic, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        `;
+
+        await pool.query(questionQuery, [
+          quizId,
+          question.questionText,
+          JSON.stringify(question.options),
+          JSON.stringify(question.correctAnswers),
+          question.hints ? JSON.stringify(question.hints) : null,
+          question.difficulty || 'medium',
+          topic
+        ]);
+      }
+    }
 
     res.status(201).json({ message: 'Quiz created successfully', quizId });
   } catch (error) {
@@ -89,7 +109,7 @@ export const getQuizById = async (req: Request, res: Response) => {
   try {
     // Get quiz
     const quizQuery = `
-      SELECT id, title, description, level, subject, year, status, created_at, updated_at
+      SELECT id, year, subject, topic, quiz_type, status, created_at, updated_at
       FROM quizzes
       WHERE id = $1
     `;
@@ -102,7 +122,7 @@ export const getQuizById = async (req: Request, res: Response) => {
 
     // Get questions
     const questionsQuery = `
-      SELECT id, question, options, correct_answer, explanation
+      SELECT id, COALESCE(question, '') as "questionText", options, correct_answers as "correctAnswers", hints, difficulty, topic
       FROM quiz_questions
       WHERE quiz_id = $1
       ORDER BY id
@@ -110,9 +130,17 @@ export const getQuizById = async (req: Request, res: Response) => {
 
     const questionsResult = await pool.query(questionsQuery, [id]);
 
+    // Parse JSON fields if they are strings
+    const parsedQuestions = questionsResult.rows.map(q => ({
+      ...q,
+      options: Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]'),
+      correctAnswers: Array.isArray(q.correctAnswers) ? q.correctAnswers : JSON.parse(q.correctAnswers || '[]'),
+      hints: q.hints ? (Array.isArray(q.hints) ? q.hints : JSON.parse(q.hints)) : null
+    }));
+
     const quiz: Quiz = {
       ...quizResult.rows[0],
-      questions: questionsResult.rows
+      questions: parsedQuestions
     };
 
     res.json({ quiz });
@@ -125,17 +153,43 @@ export const getQuizById = async (req: Request, res: Response) => {
 // PUT /api/admin/quizzes/:id - Update a quiz
 export const updateQuiz = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { year, subject, topic, bloom_level, status } = req.body;
+  const { year, subject, topic, quizType, status, questions } = req.body;
 
   try {
     // Update quiz
     const quizQuery = `
       UPDATE quizzes
-      SET year = $1, subject = $2, topic = $3, bloom_level = $4, status = $5
+      SET year = $1, subject = $2, topic = $3, quiz_type = $4, status = $5, updated_at = NOW()
       WHERE id = $6
     `;
 
-    await pool.query(quizQuery, [year, subject, topic, bloom_level, status, id]);
+    await pool.query(quizQuery, [year, subject, topic, quizType || 'mcq', status, id]);
+
+    // Update questions if provided
+    if (questions !== undefined) {
+      // Delete existing questions
+      await pool.query('DELETE FROM quiz_questions WHERE quiz_id = $1', [id]);
+
+      // Insert new questions
+      if (questions && questions.length > 0) {
+        for (const question of questions) {
+          const questionQuery = `
+            INSERT INTO quiz_questions (quiz_id, question, options, correct_answers, hints, difficulty, topic, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+          `;
+
+          await pool.query(questionQuery, [
+            id,
+            question.questionText,
+            JSON.stringify(question.options),
+            JSON.stringify(question.correctAnswers),
+            question.hints ? JSON.stringify(question.hints) : null,
+            question.difficulty || 'medium',
+            topic
+          ]);
+        }
+      }
+    }
 
     res.json({ message: 'Quiz updated successfully' });
   } catch (error) {
@@ -173,7 +227,7 @@ export const getQuizForStudent = async (req: Request, res: Response) => {
   try {
     // Get quiz by year, subject, topic and ensure it's published
     const quizQuery = `
-      SELECT id, year, subject, topic, bloom_level, status, created_at
+      SELECT id, year, subject, topic, status, created_at
       FROM quizzes
       WHERE year = $1 AND subject = $2 AND topic = $3 AND status = 'published'
     `;
@@ -188,7 +242,7 @@ export const getQuizForStudent = async (req: Request, res: Response) => {
 
     // Get questions for the quiz
     const questionsQuery = `
-      SELECT id, question, options, correct_answer, explanation
+      SELECT id, question as questionText, options, correct_answers as correctAnswers
       FROM quiz_questions
       WHERE quiz_id = $1
       ORDER BY id
