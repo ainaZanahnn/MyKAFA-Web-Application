@@ -99,13 +99,13 @@ export function LearningModuleManagement() {
         }
         const response = await axios.get(url);
         // Map yearLevel back to Malay for display
-        const mappedLessons = response.data.data.map((lesson: Lesson) => ({
+        const mappedLessons = (response.data.data || []).map((lesson: Lesson) => ({
           ...lesson,
           yearLevel: reverseYearMapping[lesson.yearLevel as keyof typeof reverseYearMapping] || lesson.yearLevel
         }));
         setLessons(mappedLessons);
-        setTotalPages(response.data.pagination.totalPages);
-        setTotalLessons(response.data.pagination.total);
+        setTotalPages(response.data.pagination?.totalPages || 1);
+        setTotalLessons(response.data.pagination?.total || 0);
       } catch (error) {
         console.error('Error fetching lessons:', error);
         toast.error('Gagal memuatkan pelajaran');
@@ -256,7 +256,7 @@ export function LearningModuleManagement() {
                   + Tambah Pelajaran
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg" aria-describedby="add-lesson-description">
+              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="mb-4"><center>Tambah Pelajaran Baru</center></DialogTitle>
                   <DialogDescription id="add-lesson-description">
@@ -488,7 +488,7 @@ export function LearningModuleManagement() {
             </Dialog>
 
             <Dialog open={!!editingLesson} onOpenChange={(open) => !open && setEditingLesson(null)}>
-              <DialogContent className="max-w-lg" aria-describedby="edit-lesson-description">
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="mb-4"><center>Edit Pelajaran</center></DialogTitle>
                   <DialogDescription id="edit-lesson-description">

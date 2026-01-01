@@ -4,13 +4,6 @@
 
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -92,19 +85,17 @@ export function LessonTable({ lessons, onUpdateStatus, onDeleteLesson, onEditLes
               </td>
               <td className="p-4">{lesson.yearLevel}</td>
               <td className="p-4">
-                <Select
-                  value={lesson.status}
-                  onValueChange={(value) => onUpdateStatus(lesson.id, value)}
-                >
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Published">Diterbitkan</SelectItem>
-                    <SelectItem value="Unpublished">Tidak Diterbitkan</SelectItem>
-                    <SelectItem value="Draft">Draf</SelectItem>
-                  </SelectContent>
-                </Select>
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                  lesson.status === 'diterbitkan'
+                    ? 'bg-green-100 text-green-800'
+                    : lesson.status === 'draf'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {lesson.status === 'diterbitkan' ? 'Diterbitkan' :
+                   lesson.status === 'draf' ? 'Draf' :
+                   lesson.status === 'diarkibkan' ? 'Diarkibkan' : 'Tidak Diketahui'}
+                </span>
               </td>
               <td className="p-4">
                 <DropdownMenu>
@@ -117,14 +108,22 @@ export function LessonTable({ lessons, onUpdateStatus, onDeleteLesson, onEditLes
                     <DropdownMenuItem onClick={() => onEditLesson?.(lesson)}>
                       <Edit className="w-4 h-4 mr-2" /> Edit Maklumat Pelajaran
                     </DropdownMenuItem>
-
-
-
-
-
-
-
-                  
+                    <DropdownMenuSeparator />
+                    {lesson.status !== 'draf' && (
+                      <DropdownMenuItem onClick={() => onUpdateStatus(lesson.id, 'draf')}>
+                        📝 Tetapkan sebagai Draf
+                      </DropdownMenuItem>
+                    )}
+                    {lesson.status !== 'diterbitkan' && (
+                      <DropdownMenuItem onClick={() => onUpdateStatus(lesson.id, 'diterbitkan')}>
+                        🟢 Terbitkan Pelajaran
+                      </DropdownMenuItem>
+                    )}
+                    {lesson.status !== 'diarkibkan' && (
+                      <DropdownMenuItem onClick={() => onUpdateStatus(lesson.id, 'diarkibkan')}>
+                        📦 Arkibkan Pelajaran
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-red-600"

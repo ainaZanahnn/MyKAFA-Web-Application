@@ -37,7 +37,7 @@ export function ProfileStudent() {
     const fetchUserProfile = async () => {
       try {
         const response = await axios.get(
-          "http://localhost:5000/api/users/profile",
+          "/api/users/profile",
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -61,7 +61,7 @@ export function ProfileStudent() {
           achievements: 3,
           totalAchievements: 600,
           profilePicture: user.profile_picture
-            ? `http://localhost:5000/${user.profile_picture}`
+            ? `/${user.profile_picture}`
             : "",
         });
       } catch (error: any) {
@@ -140,7 +140,7 @@ export function ProfileStudent() {
       }
 
       const response = await axios.put(
-        "http://localhost:5000/api/users/profile",
+        "/api/users/profile",
         updates,
         {
           headers: {
@@ -189,7 +189,7 @@ export function ProfileStudent() {
         formData.append("profilePicture", file);
 
         const response = await axios.put(
-          "http://localhost:5000/api/users/profile/picture",
+          "/api/users/profile/picture",
           formData,
           {
             headers: {
@@ -201,7 +201,7 @@ export function ProfileStudent() {
 
         const updatedUser = response.data.data;
         const newPictureUrl = updatedUser.profile_picture
-          ? `http://localhost:5000/${updatedUser.profile_picture}`
+          ? `/${updatedUser.profile_picture}`
           : "";
 
         if (isEditing) {

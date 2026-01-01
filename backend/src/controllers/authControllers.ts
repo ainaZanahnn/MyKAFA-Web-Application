@@ -16,6 +16,43 @@ import {
   getUserProgress,
   initializeProgress,
 } from "../models/progressModel";
+import pool from "../config/db";
+
+// Database operation retry utility
+const retryDatabaseOperation = async <T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  delay: number = 1000
+): Promise<T> => {
+  let lastError: Error;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+
+      // Check if it's a connection error that we should retry
+      if (error.code === 'ECONNREFUSED' ||
+          error.code === 'ENOTFOUND' ||
+          error.message?.includes('connection') ||
+          error.message?.includes('timeout')) {
+
+        if (attempt < maxRetries) {
+          console.warn(`Database operation failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2; // Exponential backoff
+          continue;
+        }
+      }
+
+      // For non-connection errors or if we've exhausted retries, throw immediately
+      throw error;
+    }
+  }
+
+  throw lastError!;
+};
 
 /**
  * REGISTER USER CONTROLLER
@@ -47,14 +84,14 @@ export const registerUser = async (req: Request, res: Response) => {
         .json({ message: "Sila isi semua maklumat wajib." });
     }
 
-    // Check if email already exists
-    const existingEmail = await findUserByEmail(email);
+    // Check if email already exists (with retry)
+    const existingEmail = await retryDatabaseOperation(() => findUserByEmail(email));
     if (existingEmail) {
       return res.status(400).json({ message: "E-mel telah digunakan." });
     }
 
-    // Check if ID pengguna already exists
-    const existingId = await findUserByIdPengguna(id_pengguna);
+    // Check if ID pengguna already exists (with retry)
+    const existingId = await retryDatabaseOperation(() => findUserByIdPengguna(id_pengguna));
     if (existingId) {
       return res.status(400).json({ message: "ID pengguna telah digunakan." });
     }
@@ -63,8 +100,8 @@ export const registerUser = async (req: Request, res: Response) => {
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
-    // Create new user in DB (using userModel)
-    const newUser = await createUser({
+    // Create new user in DB (using userModel) with retry
+    const newUser = await retryDatabaseOperation(() => createUser({
       role,
       id_pengguna,
       full_name,
@@ -76,7 +113,7 @@ export const registerUser = async (req: Request, res: Response) => {
       telefon: role === "guardian" ? phone : null,
       password_hash,
       status: "active", // default status
-    });
+    }));
 
     if (!newUser.id) {
       throw new Error("User ID not found after creation");
@@ -85,7 +122,7 @@ export const registerUser = async (req: Request, res: Response) => {
 
     if (role === "student") {
       const registrationYear = parseInt(grade || "1");
-      await initializeProgress(newUser.id, registrationYear);
+      await retryDatabaseOperation(() => initializeProgress(newUser.id!, registrationYear));
     }
 
     // Log successful registration for verification

@@ -76,7 +76,7 @@ export default function UserManagement() {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get("http://localhost:5000/api/users", {
+      const response = await axios.get("/api/users", {
         params: {
           role:
             userType === "all"
@@ -157,7 +157,7 @@ export default function UserManagement() {
     if (!userToDelete) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/users/${userToDelete.id}`, {
+      await axios.delete(`/api/users/${userToDelete.id}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },

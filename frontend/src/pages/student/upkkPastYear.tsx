@@ -82,7 +82,7 @@ export default function KertasSoalanUPKK() {
   const fetchPapers = async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get("http://localhost:5000/api/upkk");
+      const response = await axios.get("/api/upkk");
 
       if (response.data.success && Array.isArray(response.data.data) && response.data.data.length > 0) {
         // Map API data to our Paper interface
@@ -162,7 +162,7 @@ export default function KertasSoalanUPKK() {
       if (paper.file_path) {
         // Trigger download via POST request (increments download count)
         const response = await axios.post(
-          `http://localhost:5000/api/upkk/${paper.id}/download`,
+          `/api/upkk/${paper.id}/download`,
           {},
           {
             responseType: "blob", // Important for file downloads

@@ -1,26 +1,34 @@
-/** @format */
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import path from 'path'
 
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
-import path from "path";
-
-// https://vite.dev/config/
+// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [tailwindcss(), react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"), //this help maps @ to src
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   server: {
-    port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: process.env.VITE_API_URL || 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
-      },
+        configure: (_proxy) => {
+          _proxy.on('error', (err) => {
+            console.log('proxy error', err);
+          });
+          _proxy.on('proxyReq', (_proxyReq, req) => {
+            console.log('Sending Request to the Target:', req.method, req.url);
+          });
+          _proxy.on('proxyRes', (proxyRes, req) => {
+            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+          });
+        },
+      }, 
     },
   },
-});
+})

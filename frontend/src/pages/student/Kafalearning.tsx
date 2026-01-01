@@ -7,7 +7,8 @@ import { StudentLessonTable } from "@/components/student/studentlessontable";
 import type { Lesson } from "@/components/student/studentlessontable";
 import { useAuth } from "@/components/auth/useAuth";
 import axios from "@/lib/axios";
-import { TestAdaptiveHints } from "@/components/quiz/TestAdaptiveHints";
+import { playClickSound } from "@/lib/sound";
+
 
 const kafaSubjects = [
   {
@@ -58,12 +59,7 @@ const kafaSubjects = [
     icon: "🎵",
     color: "from-lime-400 to-green-500",
   },
-  {
-    id: 9,
-    name: "Test Kuiz Adaptif",
-    icon: "🧠",
-    color: "from-red-400 to-pink-500",
-  },
+
 ];
 
 const yearLevels = [
@@ -119,25 +115,26 @@ interface ProgressItem {
 }
 
 export function LearningKafa() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, refreshTrigger } = useAuth();
   const [selectedYear, setSelectedYear] = useState<YearLevel | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [progress, setProgress] = useState<ProgressItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [lessonsRefreshTrigger, setLessonsRefreshTrigger] = useState(0);
 
   useEffect(() => {
     const fetchProgress = async () => {
       try {
-        const response = await axios.get(`/progress?t=${Date.now()}`);
+        const response = await axios.get(`/api/progress?t=${Date.now()}`);
         setProgress(response.data.progress);
 
         // If no progress exists, initialize it
         if (response.data.progress.length === 0) {
           const registrationYear = parseInt(currentUser?.tahun_darjah || "1");
-          await axios.post('/progress/initialize', { registrationYear });
+          await axios.post('/api/progress/initialize', { registrationYear });
           // Fetch progress again after initialization
-          const updatedResponse = await axios.get(`/progress?t=${Date.now()}`);
+          const updatedResponse = await axios.get(`/api/progress?t=${Date.now()}`);
           setProgress(updatedResponse.data.progress);
         }
       } catch (error) {
@@ -151,7 +148,7 @@ export function LearningKafa() {
     if (selectedYear && selectedSubject) {
       setLoading(true);
       try {
-        const response = await axios.get('/lessons', {
+        const response = await axios.get('/api/lessons', {
           params: {
             subject: selectedSubject.name,
             year_level: `Year ${selectedYear.year}`
@@ -172,7 +169,7 @@ export function LearningKafa() {
 
   useEffect(() => {
     fetchLessons();
-  }, [selectedYear, selectedSubject]);
+  }, [selectedYear, selectedSubject, refreshTrigger, lessonsRefreshTrigger]);
 
   const calculateYearProgress = (year: number) => {
     const yearProgress = progress.filter((p: ProgressItem) => p.year === year);
@@ -217,7 +214,12 @@ export function LearningKafa() {
               return (
                 <button
                   key={year.year}
-                  onClick={() => isAccessible && setSelectedYear(year)}
+                  onClick={() => {
+                    if (isAccessible) {
+                      playClickSound();
+                      setSelectedYear(year);
+                    }
+                  }}
                   disabled={!isAccessible}
                   className={`group relative overflow-hidden rounded-3xl transition-all duration-300 transform ${
                     isAccessible
@@ -244,11 +246,6 @@ export function LearningKafa() {
                       {isAccessible && (
                         <p className="text-sm text-white font-semibold opacity-90 mt-2">
                           {yearProgress}% Selesai
-                        </p>
-                      )}
-                      {!isAccessible && (
-                        <p className="text-xs text-white font-semibold opacity-75 mt-2">
-                          kunci
                         </p>
                       )}
                     </div>
@@ -285,7 +282,10 @@ export function LearningKafa() {
               return (
                 <button
                   key={subject.id}
-                  onClick={() => setSelectedSubject(subject)}
+                  onClick={() => {
+                    playClickSound();
+                    setSelectedSubject(subject);
+                  }}
                   className="group relative overflow-hidden rounded-3xl transition-all duration-300 transform hover:scale-105 hover:shadow-2xl active:scale-95 cursor-pointer"
                 >
                   <div
@@ -318,9 +318,6 @@ export function LearningKafa() {
           <div className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-3xl shadow-lg p-6 md:p-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <p className="text-gray-600 text-sm font-semibold uppercase tracking-wider">
-                  Laluan Pembelajaran Anda
-                </p>
                 <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
                   <span className="text-purple-600">
                     {selectedSubject.name}
@@ -351,8 +348,6 @@ export function LearningKafa() {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
               <span className="ml-3 text-gray-600">Memuatkan pelajaran...</span>
             </div>
-          ) : selectedSubject.name === "Test Kuiz Adaptif" ? (
-            <TestAdaptiveHints />
           ) : (
             <StudentLessonTable
               lessons={lessons}
@@ -362,14 +357,17 @@ export function LearningKafa() {
                 // Refresh progress data with cache busting
                 const fetchUpdatedProgress = async () => {
                   try {
-                    const response = await axios.get(`/progress?t=${Date.now()}`);
+                    const response = await axios.get(`/api/progress?t=${Date.now()}`);
                     setProgress(response.data.progress);
+                    // Trigger lessons refresh to update material progress
+                    setLessonsRefreshTrigger(prev => prev + 1);
                   } catch (error) {
                     console.error('Error refreshing progress:', error);
                   }
                 };
                 fetchUpdatedProgress();
               }}
+              progressRefreshTrigger={lessonsRefreshTrigger}
             />
           )}
         </div>

@@ -21,7 +21,13 @@ interface AuthenticatedRequest extends Request {
 export const getProgress = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
+    const userRole = req.user?.role;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    // Only allow students to access progress
+    if (userRole !== "student") {
+      return res.status(403).json({ message: "Access denied. Progress tracking is only available for students." });
+    }
 
     const progress = await getMergedUserProgress(userId);
     const currentYear = await getCurrentMergedProgressYear(userId);
@@ -45,9 +51,16 @@ export const completeUserTopic = async (
 ) => {
   try {
     const userId = req.user?.id;
+    const userRole = req.user?.role;
     const { year, subject, topic } = req.body;
 
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    // Only allow students to update progress
+    if (userRole !== "student") {
+      return res.status(403).json({ message: "Access denied. Progress tracking is only available for students." });
+    }
+
     if (!year || !subject || !topic)
       return res
         .status(400)

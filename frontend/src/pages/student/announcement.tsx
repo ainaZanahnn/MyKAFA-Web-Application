@@ -23,7 +23,7 @@ export default function Announcements() {
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/announcements");
+        const response = await fetch("/api/announcements");
         if (!response.ok) {
           throw new Error("Failed to fetch announcements");
         }

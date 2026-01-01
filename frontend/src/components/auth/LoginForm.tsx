@@ -7,7 +7,7 @@ import { validateLoginForm } from "./validator";
 import { useAuth } from "./useAuth";
 
 const LoginForm = () => {
-  const { login, user } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const [loginIdentifier, setLoginIdentifier] = useState("");
@@ -23,14 +23,14 @@ const LoginForm = () => {
 
     if (Object.keys(errs).length === 0) {
       try {
-        const success = await login(loginIdentifier, loginPassword);
+        const result = await login(loginIdentifier, loginPassword);
 
-        if (success && user) {
-          if (user.role === "admin") {
+        if (result.success && result.user) {
+          if (result.user.role === "admin") {
             navigate("/admin/dashboard");
-          } else if (user.role === "student") {
+          } else if (result.user.role === "student") {
             navigate("/student/dashboard");
-          } else if (user.role === "guardian") {
+          } else if (result.user.role === "guardian") {
             navigate("/guardian/dashboard");
           }
         }

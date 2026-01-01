@@ -7,7 +7,7 @@ import { useAuth } from "@/components/auth/useAuth";
 import { useNavigate } from "react-router-dom";
 
 export function Header() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -18,7 +18,7 @@ export function Header() {
   return (
     <header className="bg-background p-4">
       <div className="flex items-center justify-end gap-4">
-        <span className="text-sm font-medium">Admin</span>
+        <span className="text-sm font-medium">{user?.full_name || user?.username || "Admin"}</span>
         <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
           <User className="w-4 h-4 text-primary-foreground" />
         </div>

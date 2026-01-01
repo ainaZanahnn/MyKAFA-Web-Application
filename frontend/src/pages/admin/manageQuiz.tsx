@@ -51,7 +51,7 @@ export default function ManageQuizPage() {
       try {
         const response = await axios.get('/admin/quizzes');
         // Transform backend data to match QuizData interface
-        const transformedQuizzes: QuizData[] = response.data.quizzes.map((quiz: BackendQuiz & { question_count?: number }) => ({
+        const transformedQuizzes: QuizData[] = (response.data.quizzes || []).map((quiz: BackendQuiz & { question_count?: number }) => ({
           id: quiz.id,
           year: quiz.year,
           subject: quiz.subject,
@@ -59,7 +59,8 @@ export default function ManageQuizPage() {
           quizType: 'mcq', // Default, can be updated based on actual data
           questions: [], // Will be populated when needed
           questionCount: quiz.question_count,
-          adaptiveSettings: defaultAdaptiveSettings
+          adaptiveSettings: defaultAdaptiveSettings,
+          status: quiz.status as 'draf' | 'diterbitkan' | 'diarkibkan'
         }));
         setQuizzes(transformedQuizzes);
       } catch (error) {
@@ -83,7 +84,7 @@ export default function ManageQuizPage() {
 
       // Refresh the quizzes list to get updated question counts
       const refreshResponse = await axios.get('/admin/quizzes');
-      const transformedQuizzes: QuizData[] = refreshResponse.data.quizzes.map((quiz: BackendQuiz & { question_count?: number }) => ({
+      const transformedQuizzes: QuizData[] = (refreshResponse.data.quizzes || []).map((quiz: BackendQuiz & { question_count?: number }) => ({
         id: quiz.id,
         year: quiz.year,
         subject: quiz.subject,
@@ -91,7 +92,8 @@ export default function ManageQuizPage() {
         quizType: 'mcq', // Default, can be updated based on actual data
         questions: [], // Will be populated when needed
         questionCount: quiz.question_count,
-        adaptiveSettings: defaultAdaptiveSettings
+        adaptiveSettings: defaultAdaptiveSettings,
+        status: quiz.status as 'draf' | 'diterbitkan' | 'diarkibkan'
       }));
       setQuizzes(transformedQuizzes);
 
@@ -210,6 +212,20 @@ export default function ManageQuizPage() {
   const availableYears = Array.from(new Set(quizzes.map(q => q.year).filter((year): year is number => year !== null))).sort((a, b) => b - a);
   const availableSubjects = Array.from(new Set(quizzes.map(q => q.subject))).sort();
 
+  const handleStatusChange = async (id: number, status: 'draf' | 'diterbitkan' | 'diarkibkan') => {
+    try {
+      await axios.put(`/admin/quizzes/${id}`, { status });
+
+      // Update local state
+      setQuizzes(quizzes.map(quiz =>
+        quiz.id === id ? { ...quiz, status } : quiz
+      ));
+    } catch (error) {
+      console.error('Error updating quiz status:', error);
+      alert('Failed to update quiz status. Please try again.');
+    }
+  };
+
   // Filter quizzes based on selected filters
   const filteredQuizzes = quizzes.filter(quiz => {
     const yearMatch = selectedYear === null || quiz.year === selectedYear;
@@ -308,7 +324,7 @@ export default function ManageQuizPage() {
             <p className="text-gray-600">
               {quizzes.length === 0
                 ? "Tiada kuiz yang dibuat lagi. Gunakan butang di atas untuk membuat kuiz pertama anda."
-                : "Tiada kuiz yang sepadan dengan penapis yang dipilih."
+                : "Tiada kuiz yang sepadan."
               }
             </p>
           </div>
@@ -317,6 +333,7 @@ export default function ManageQuizPage() {
             quizzes={filteredQuizzes}
             onDeleteQuiz={handleDeleteQuiz}
             onEditQuiz={handleEditQuiz}
+            onStatusChange={handleStatusChange}
           />
         )}
       </div>

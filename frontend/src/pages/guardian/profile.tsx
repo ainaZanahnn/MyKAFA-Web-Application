@@ -32,7 +32,7 @@ export function ProfileAccount() {
     const fetchUserProfile = async () => {
       try {
         const response = await axios.get(
-          "http://localhost:5000/api/users/profile",
+          "/api/users/profile",
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -112,7 +112,7 @@ export function ProfileAccount() {
       }
 
       const response = await axios.put(
-        "http://localhost:5000/api/users/profile",
+        "/api/users/profile",
         updates,
         {
           headers: {

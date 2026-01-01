@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS student_progress (
     topic VARCHAR(255) NOT NULL,
     lesson_completed BOOLEAN DEFAULT FALSE,
     lesson_completed_at TIMESTAMP,
+    materials_viewed INTEGER[] DEFAULT '{}',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, year, subject, topic)

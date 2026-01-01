@@ -170,9 +170,6 @@ export function ActivitySelector({ onSelectActivity }: { onSelectActivity: (acti
           <div className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-3xl shadow-lg p-6 md:p-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <p className="text-gray-600 text-sm font-semibold uppercase tracking-wider">
-                  Laluan Pembelajaran Anda
-                </p>
                 <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
                   <span className="text-purple-600">
                     {SUBJECTS.find((s) => s.nameEn === selectedSubject)?.nameMy}

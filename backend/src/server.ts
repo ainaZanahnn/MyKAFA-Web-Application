@@ -4,6 +4,7 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
 import pool from "./config/db";
 import cookieParser from "cookie-parser";
 import authRoutes from "./routes/authRoutes";
@@ -16,6 +17,27 @@ import quizRoutes from "./routes/quizRoutes";
 
 // Load environment variables
 dotenv.config();
+
+// Database health check endpoint
+const healthCheck = async (req: express.Request, res: express.Response) => {
+  try {
+    // Test database connection
+    await pool.query('SELECT 1');
+    res.status(200).json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      database: 'connected'
+    });
+  } catch (error: any) {
+    console.error('Health check failed:', error);
+    res.status(500).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      database: 'disconnected',
+      error: error.message
+    });
+  }
+};
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -46,6 +68,16 @@ app.get("/", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Database connection failed" });
   }
 });
+
+// Database health check route
+app.get("/health/db", healthCheck);
+
+// SPA fallback - serve index.html for any non-API routes (only in production)
+if (process.env.NODE_ENV === 'production') {
+  app.use((req: Request, res: Response) => {
+    res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
+  });
+}
 
 // Start the server
 app.listen(PORT, () => {

@@ -14,7 +14,7 @@ axios.interceptors.request.use(
   }
 );
 
-// Configure axios base URL to use the proxy
-axios.defaults.baseURL = '/api';
+// Base URL is handled by Vite proxy in development
+// In production, it will use the same domain
 
 export default axios;

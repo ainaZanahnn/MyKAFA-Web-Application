@@ -43,7 +43,8 @@ export interface AxiosError {
 export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (identifier: string, password: string) => Promise<boolean>;
+  refreshTrigger: number;
+  login: (identifier: string, password: string) => Promise<{ success: boolean; user: User | null }>;
   logout: () => void;
   register: (
     formData: RegisterFormData

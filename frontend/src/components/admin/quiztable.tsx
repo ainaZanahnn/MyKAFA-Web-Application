@@ -62,12 +62,14 @@ export interface QuizData {
   questions: Question[];
   questionCount?: number;
   adaptiveSettings: AdaptiveQuizSettings;
+  status?: 'draf' | 'diterbitkan' | 'diarkibkan';
 }
 
 interface QuizTableProps {
   quizzes: QuizData[];
   onDeleteQuiz?: (id: number) => void;
   onEditQuiz?: (quiz: QuizData, index: number) => void;
+  onStatusChange?: (id: number, status: 'draf' | 'diterbitkan' | 'diarkibkan') => void;
   currentPage?: number;
   totalPages?: number;
   totalQuizzes?: number;
@@ -79,6 +81,7 @@ export function QuizTable({
   quizzes,
   onDeleteQuiz,
   onEditQuiz,
+  onStatusChange,
   currentPage = 1,
   totalPages = 1,
   totalQuizzes = 0,
@@ -96,6 +99,7 @@ export function QuizTable({
             <th className="p-4 text-left">Topik</th>
             <th className="p-4 text-left">Jenis</th>
             <th className="p-4 text-left">Bilangan Kuiz</th>
+            <th className="p-4 text-left">Status</th>
             <th className="p-4 text-left">Tindakan</th>
           </tr>
         </thead>
@@ -108,6 +112,19 @@ export function QuizTable({
               <td className="p-4">{quiz.quizType}</td>
               <td className="p-4">{quiz.questionCount ?? quiz.questions.length}</td>
               <td className="p-4">
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                  quiz.status === 'diterbitkan'
+                    ? 'bg-green-100 text-green-800'
+                    : quiz.status === 'draf'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {quiz.status === 'diterbitkan' ? 'Diterbitkan' :
+                   quiz.status === 'draf' ? 'Draf' :
+                   quiz.status === 'diarkibkan' ? 'Diarkibkan' : 'Tidak Diketahui'}
+                </span>
+              </td>
+              <td className="p-4">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm">
@@ -118,6 +135,22 @@ export function QuizTable({
                     <DropdownMenuItem onClick={() => onEditQuiz?.(quiz, index)}>
                       <Edit className="w-4 h-4 mr-2" /> Sunting Kuiz
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {quiz.status !== 'draf' && (
+                      <DropdownMenuItem onClick={() => onStatusChange?.(quiz.id!, 'draf')}>
+                        📝 Tetapkan sebagai Draf
+                      </DropdownMenuItem>
+                    )}
+                    {quiz.status !== 'diterbitkan' && (
+                      <DropdownMenuItem onClick={() => onStatusChange?.(quiz.id!, 'diterbitkan')}>
+                        🟢 Terbitkan Kuiz
+                      </DropdownMenuItem>
+                    )}
+                    {quiz.status !== 'diarkibkan' && (
+                      <DropdownMenuItem onClick={() => onStatusChange?.(quiz.id!, 'diarkibkan')}>
+                        📦 Arkibkan Kuiz
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-red-600"

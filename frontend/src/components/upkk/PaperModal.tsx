@@ -53,7 +53,7 @@ const PaperModal: React.FC<PaperModalProps> = ({
         <div className="flex-1 overflow-hidden bg-gray-100">
           {paper.file_path ? (
             <iframe
-              src={`http://localhost:5000/api/upkk/${paper.id}/view`}
+              src={`/api/upkk/${paper.id}/view`}
               className="w-full h-full min-h-[600px] border-0"
               title={`Preview ${paper.subject} ${paper.year}`}
             />

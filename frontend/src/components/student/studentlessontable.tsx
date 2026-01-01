@@ -13,6 +13,7 @@ import { defaultAdaptiveSettings } from "@/lib/quiz-constants";
 import type { QuizSummary, Question } from "@/lib/AdaptiveQuizEngine";
 import axios from "@/lib/axios";
 import { toast } from "react-toastify";
+import { useAuth } from "@/components/auth/useAuth";
 
 export type Lesson = {
   id: number;
@@ -47,6 +48,7 @@ export interface StudentProgress {
   topic: string;
   lesson_completed?: boolean;
   lesson_completed_at?: Date | null;
+  topic_completed?: boolean;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -56,9 +58,11 @@ interface StudentLessonTableProps {
   selectedYear?: number;
   selectedSubject?: string;
   onProgressUpdate?: () => void;
+  progressRefreshTrigger?: number;
 }
 
-export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onProgressUpdate }: StudentLessonTableProps) {
+export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onProgressUpdate, progressRefreshTrigger }: StudentLessonTableProps) {
+  const { user: currentUser, refreshTrigger } = useAuth();
   const [completedLessons, setCompletedLessons] = useState<Set<number>>(new Set());
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
@@ -71,8 +75,13 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
   // Fetch progress on mount and when selectedYear changes
   useEffect(() => {
     const fetchProgress = async () => {
+      // Only fetch progress if user is authenticated and is a student
+      if (!currentUser || currentUser.role !== 'student') {
+        return;
+      }
+
       try {
-        const response = await axios.get('/progress');
+        const response = await axios.get(`/api/progress?t=${Date.now()}`);
         const progress: StudentProgress[] = response.data.progress;
 
         // Filter progress for the selected year and subject
@@ -91,13 +100,15 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
             }
           }
         });
-        setCompletedLessons(completedLessonIds);
+
+        // Merge with existing completed lessons to preserve local state
+        setCompletedLessons(prev => new Set([...prev, ...completedLessonIds]));
 
         // Fetch material progress for each lesson
         const materialProgressData: { [lessonId: number]: { viewed: number; total: number } } = {};
         for (const lesson of lessons) {
           try {
-            const materialResponse = await axios.get(`/progress/material-progress?year=${selectedYear}&subject=${selectedSubject}&topic=${lesson.title}`);
+            const materialResponse = await axios.get(`/api/progress/material-progress?year=${selectedYear}&subject=${selectedSubject}&topic=${lesson.title}`);
             const materialsViewed = materialResponse.data.materialsViewed || [];
             materialProgressData[lesson.id] = {
               viewed: materialsViewed.length,
@@ -117,14 +128,14 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
       }
     };
 
-    if (selectedYear && lessons.length > 0) {
+    if (selectedYear && lessons.length > 0 && currentUser && currentUser.role === 'student') {
       fetchProgress();
     }
-  }, [selectedYear, selectedSubject, lessons]);
+  }, [selectedYear, selectedSubject, lessons, currentUser, refreshTrigger, progressRefreshTrigger]);
 
   // Debug logging
   console.log('StudentLessonTable received lessons:', lessons);
-  const publishedLessons = (Array.isArray(lessons) ? lessons : []).filter((lesson) => lesson.status === 'Published');
+  const publishedLessons = (Array.isArray(lessons) ? lessons : []).filter((lesson) => lesson.status === 'diterbitkan');
   console.log('Published lessons:', publishedLessons);
 
   const handleStartLesson = (lesson: Lesson) => {
@@ -132,12 +143,33 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
     setIsViewerOpen(true);
   };
 
+  const refreshMaterialProgress = async () => {
+    const materialProgressData: { [lessonId: number]: { viewed: number; total: number } } = {};
+    for (const lesson of lessons) {
+      try {
+        const materialResponse = await axios.get(`/api/progress/material-progress?year=${selectedYear}&subject=${selectedSubject}&topic=${lesson.title}`);
+        const materialsViewed = materialResponse.data.materialsViewed || [];
+        materialProgressData[lesson.id] = {
+          viewed: materialsViewed.length,
+          total: lesson.materials?.length || 0
+        };
+      } catch (error) {
+        console.error(`Error fetching material progress for lesson ${lesson.id}:`, error);
+        materialProgressData[lesson.id] = {
+          viewed: 0,
+          total: lesson.materials?.length || 0
+        };
+      }
+    }
+    setMaterialProgress(materialProgressData);
+  };
+
   const handleCompleteLesson = async (lessonId: number) => {
     const lesson = lessons.find(l => l.id === lessonId);
     if (!lesson || !selectedYear || !selectedSubject) return;
 
     try {
-      await axios.post('/progress/complete-topic', {
+      await axios.post('/api/progress/complete-topic', {
         year: selectedYear,
         subject: selectedSubject,
         topic: lesson.title
@@ -149,6 +181,9 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
       if (onProgressUpdate) {
         onProgressUpdate();
       }
+
+      // Refresh material progress to reflect completion
+      await refreshMaterialProgress();
     } catch (error) {
       console.error('Error completing lesson:', error);
       toast.error('Failed to complete lesson');
@@ -159,7 +194,7 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
     if (!selectedYear || !selectedSubject) return;
 
     try {
-      const response = await axios.get(`/quizzes/student/${selectedYear}/${selectedSubject}/${lesson.title}`);
+      const response = await axios.get(`/api/quizzes/student/${selectedYear}/${selectedSubject}/${lesson.title}`);
       const quiz = response.data.quiz;
       if (quiz && quiz.questions && quiz.questions.length > 0) {
         setQuizQuestions(quiz.questions);
@@ -207,10 +242,12 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
   return (
     <div className="space-y-4">
       {(Array.isArray(lessons) ? lessons : [])
-        .filter((lesson) => lesson.status === 'Published')
+        .filter((lesson) => lesson.status === 'diterbitkan')
         .sort((a, b) => a.order - b.order)
         .map((lesson) => {
-          const isCompleted = completedLessons.has(lesson.id);
+          // Determine completion: lesson is completed if all materials viewed or historically completed
+          const materialProgressData = materialProgress[lesson.id];
+          const isCompleted = (materialProgressData && materialProgressData.total > 0 && materialProgressData.viewed === materialProgressData.total) || completedLessons.has(lesson.id);
           const materialIcons = getMaterialIcons(lesson.materials || []);
 
           return (
@@ -231,12 +268,13 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
                       }`}>
                         {isCompleted ? <CheckCircle className="w-4 h-4" /> : lesson.order}
                       </div>
-                      <Badge variant="secondary" className="text-xs">
-                        {lesson.subject}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {lesson.yearLevel}
-                      </Badge>
+                      {materialProgress[lesson.id] && materialProgress[lesson.id].total > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          {materialProgress[lesson.id].viewed}/{materialProgress[lesson.id].total} bahan dilihat
+                        </Badge>
+                      </div>
+                    )}
                     </div>
 
                     <h3 className="text-xl font-bold text-gray-800 mb-2">
@@ -245,13 +283,6 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
                     <p className="text-gray-600 text-sm mb-2">
                       {lesson.description}
                     </p>
-                    {materialProgress[lesson.id] && materialProgress[lesson.id].total > 0 && (
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">
-                          {materialProgress[lesson.id].viewed}/{materialProgress[lesson.id].total} bahan dilihat
-                        </Badge>
-                      </div>
-                    )}
                   </div>
 
                   {/* Materials Visual - Right Side */}
@@ -295,16 +326,17 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
       {selectedSubject && (
         <div className="mt-8">
           <div className="text-center mb-6">
-            <h3 className="text-2xl font-bold text-gray-800 mb-2">Kuiz Penilaian 📝</h3>
-            <p className="text-gray-600">Selesaikan pelajaran untuk membuka kuiz topik masing-masing!</p>
+            <h3 className="text-2xl font-bold text-gray-800 mb-2">Cabaran Kuiz</h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {(Array.isArray(lessons) ? lessons : [])
-              .filter((lesson) => lesson.status === 'Published')
-              .sort((a, b) => a.order - b.order)
+              .filter((lesson) => lesson.status === 'diterbitkan')
               .map((lesson) => {
-                const isLessonCompleted = completedLessons.has(lesson.id);
+                // Determine completion: lesson is completed if historically completed OR all current materials viewed
+                const materialProgressData = materialProgress[lesson.id];
+                const isLessonCompleted = completedLessons.has(lesson.id) ||
+                  (materialProgressData && materialProgressData.total > 0 && materialProgressData.viewed === materialProgressData.total);
                 const isQuizCompleted = false; // TODO: Implement quiz completion tracking per topic
 
                 return (
@@ -315,7 +347,7 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
                     }`}
                   >
                     <div className="p-6">
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center justify-center mb-4">
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg ${
                           isQuizCompleted
                             ? 'bg-green-500'
@@ -328,26 +360,17 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
                         {isQuizCompleted && <Star className="w-8 h-8 text-yellow-500" />}
                       </div>
 
-                      <h4 className="text-xl font-bold text-gray-800 mb-2">
+                      <h4 className="text-xl font-bold text-gray-800 mb-2 text-center">
                         Kuiz {lesson.title}
                       </h4>
-                      <p className="text-gray-600 text-sm mb-4">
+                      <p className="text-gray-600 text-sm mb-4 text-center">
                         {isQuizCompleted
                           ? "Tahniah! Anda telah menyelesaikan kuiz ini dengan jayanya."
                           : isLessonCompleted
-                          ? "Kuiz adaptif yang akan menyesuaikan kesukaran berdasarkan prestasi anda."
-                          : "Selesaikan pelajaran ini terlebih dahulu untuk membuka kuiz."
+                          ? "Selamat Mencuba."
+                          : "Belajar topik Kuiz ini terlebih dahulu."
                         }
                       </p>
-
-                      {isLessonCompleted && !isQuizCompleted && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                          <div className="flex items-center gap-2 text-blue-800 text-sm">
-                            <CheckCircle className="w-4 h-4" />
-                            <span>Pelajaran telah diselesaikan!</span>
-                          </div>
-                        </div>
-                      )}
 
                       <Button
                         onClick={() => handleStartQuiz(lesson)}
@@ -373,18 +396,10 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
                         ) : (
                           <>
                             <Lock className="w-4 h-4 mr-2" />
-                            Kuiz Terkunci
+                            Kuiz kunci
                           </>
                         )}
                       </Button>
-
-                      {isLessonCompleted && (
-                        <div className="mt-3 text-center">
-                          <p className="text-xs text-gray-500">
-                            Kuiz untuk topik {lesson.title}
-                          </p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
@@ -402,27 +417,16 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
           setSelectedLesson(null);
         }}
         onComplete={handleCompleteLesson}
+        selectedYear={selectedYear}
       />
 
       {/* Quiz Player Modal */}
       {showQuiz && selectedQuizLesson && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Kuiz {selectedQuizLesson.title}</h2>
-              <Button
-                onClick={() => {
-                  setShowQuiz(false);
-                  setQuizSummary(null);
-                }}
-                variant="outline"
-              >
-                Tutup
-              </Button>
-            </div>
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <AdaptiveQuizPlayer
-              questions={quizQuestions}
               settings={defaultAdaptiveSettings}
+              questions={quizQuestions}
               onComplete={handleQuizComplete}
               onExit={() => {
                 setShowQuiz(false);

@@ -5,6 +5,7 @@ import HomePage from "./pages/HomePage";
 import { AuthProvider } from "./components/auth/AuthProvider";
 import AuthSlider from "./components/auth/AuthSlider";
 
+
 import { AdminLayout } from "@/layout/admin-layout";
 import Dashboard from "@/pages/admin/dashboard";
 import Announcements from "@/pages/admin/announcements";
@@ -19,7 +20,7 @@ import StudentDashboard from "@/pages/student/dashboard";
 import StudentAnnouncements from "@/pages/student/announcement";
 import { LearningKafa } from "@/pages/student/Kafalearning";
 import UpkkPY from "@/pages/student/upkkPastYear";
-import { ActivitySelector as InteractiveActivities } from "@/pages/student/interactiveactivities";
+//import { ActivitySelector as InteractiveActivities } from "@/pages/student/interactiveactivities";
 
 import { Layout as GuardianLayout } from "@/layout/guardian-layout";
 import ProfileStudent from "@/pages/student/profile";
@@ -29,6 +30,9 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css"; // important for styles
 
 function App() {
+  
+
+
   return (
     <AuthProvider>
       <Router>
@@ -52,10 +56,6 @@ function App() {
             <Route path="kafalearning" element={<LearningKafa />} />
             <Route path="upkkPastYear" element={<UpkkPY />} />
             <Route path="profile" element={<ProfileStudent />} />
-            <Route
-              path="interactiveactivities"
-              element={<InteractiveActivities />}
-            />
           </Route>
           {/* Guardian routes */}
           <Route path="/guardian" element={<GuardianLayout />}>

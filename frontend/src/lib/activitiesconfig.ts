@@ -166,7 +166,7 @@ export const TRANSLATIONS = {
     whatsYear: "Tahun berapa anda?",
     greatChoice: "Pilihan bagus! Anda memilih",
     pickActivity: "Pilih aktiviti",
-    yourLearningPath: "Laluan Pembelajaran Anda",
+    yourLearningPath: "LALUANlajaran Anda",
     changeSubject: "Ubah Subjek",
     changeYear: "Ubah Tahun",
     level: "Tahap",

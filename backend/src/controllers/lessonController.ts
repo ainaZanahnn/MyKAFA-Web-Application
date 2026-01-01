@@ -2,6 +2,38 @@ import { Request, Response } from 'express';
 import pool from '../config/db';
 import { getTopicsBySubjectYear } from '../models/lessonModel';
 
+// Status mapping between English (DB) and Malay (Frontend)
+const statusMap = {
+  'draft': 'draf',
+  'published': 'diterbitkan',
+  'archived': 'diarkibkan'
+};
+
+const reverseStatusMap = {
+  'draf': 'draft',
+  'diterbitkan': 'published',
+  'diarkibkan': 'archived'
+};
+
+// Year level mapping between English (DB) and Malay (Frontend)
+const yearMap = {
+  'Year 1': 'Tahun 1',
+  'Year 2': 'Tahun 2',
+  'Year 3': 'Tahun 3',
+  'Year 4': 'Tahun 4',
+  'Year 5': 'Tahun 5',
+  'Year 6': 'Tahun 6'
+};
+
+const reverseYearMap = {
+  'Tahun 1': 'Year 1',
+  'Tahun 2': 'Year 2',
+  'Tahun 3': 'Year 3',
+  'Tahun 4': 'Year 4',
+  'Tahun 5': 'Year 5',
+  'Tahun 6': 'Year 6'
+};
+
 export const getLessons = async (req: Request, res: Response) => {
   try {
     const { subject, year_level, page = 1, limit = 10 } = req.query;
@@ -52,10 +84,17 @@ export const getLessons = async (req: Request, res: Response) => {
 
     const result = await pool.query(query, values);
 
+    // Map status and year level to Malay for frontend
+    const mappedData = result.rows.map(lesson => ({
+      ...lesson,
+      status: statusMap[lesson.status as keyof typeof statusMap] || lesson.status,
+      yearLevel: yearMap[lesson.yearLevel as keyof typeof yearMap] || lesson.yearLevel
+    }));
+
     const totalPages = Math.ceil(total / Number(limit));
 
     res.json({
-      data: result.rows,
+      data: mappedData,
       pagination: {
         currentPage: Number(page),
         totalPages,
@@ -95,7 +134,15 @@ export const getLessonById = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Lesson not found' });
     }
 
-    res.json(result.rows[0]);
+    // Map status and year level to Malay for frontend
+    const lesson = result.rows[0];
+    const mappedLesson = {
+      ...lesson,
+      status: statusMap[lesson.status as keyof typeof statusMap] || lesson.status,
+      yearLevel: yearMap[lesson.yearLevel as keyof typeof yearMap] || lesson.yearLevel
+    };
+
+    res.json(mappedLesson);
   } catch (error) {
     console.error('Error fetching lesson:', error);
     res.status(500).json({ error: 'Failed to fetch lesson' });
@@ -114,6 +161,9 @@ export const createLesson = async (req: Request, res: Response) => {
       materials = [];
     }
 
+    // Convert Malay year level to English for DB storage
+    const dbYearLevel = reverseYearMap[year_level as keyof typeof reverseYearMap] || year_level;
+
     // Create lesson
     const lessonQuery = `
       INSERT INTO lessons (subject, title, description, year_level, status, lesson_order, created_at, updated_at)
@@ -125,8 +175,8 @@ export const createLesson = async (req: Request, res: Response) => {
       subject,
       title,
       description,
-      year_level,
-      status || 'Draft',
+      dbYearLevel,
+      status || 'draft',
       lesson_order || 1,
     ]);
 
@@ -206,13 +256,26 @@ export const updateLesson = async (req: Request, res: Response) => {
       materials = [];
     }
 
-    // Check if lesson exists
-    const checkQuery = 'SELECT id FROM lessons WHERE id = $1';
+    // Check if lesson exists and get current material count
+    const checkQuery = `
+      SELECT l.id, l.subject, l.title, l.year_level,
+             COUNT(lm.id) as current_material_count
+      FROM lessons l
+      LEFT JOIN lesson_materials lm ON l.id = lm.lesson_id
+      WHERE l.id = $1
+      GROUP BY l.id, l.subject, l.title, l.year_level
+    `;
     const checkResult = await pool.query(checkQuery, [id]);
 
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ error: 'Lesson not found' });
     }
+
+    const currentMaterialCount = parseInt(checkResult.rows[0].current_material_count);
+    const lessonInfo = checkResult.rows[0];
+
+    // Convert Malay year level to English for DB storage
+    const dbYearLevel = reverseYearMap[year_level as keyof typeof reverseYearMap] || year_level;
 
     // Update lesson
     const updateQuery = `
@@ -225,25 +288,68 @@ export const updateLesson = async (req: Request, res: Response) => {
       subject,
       title,
       description,
-      year_level,
+      dbYearLevel,
       status,
       lesson_order,
       id,
     ]);
 
     // Update materials if provided
+    let newMaterialCount = 0;
     if (materials !== undefined) {
-      // Delete existing materials
-      await pool.query('DELETE FROM lesson_materials WHERE lesson_id = $1', [id]);
+      // Get existing materials to preserve IDs when possible
+      const existingMaterials = await pool.query(
+        'SELECT id, type, title, url FROM lesson_materials WHERE lesson_id = $1 ORDER BY id',
+        [id]
+      );
+
+      // Create a map of existing materials by title+type for matching
+      const existingMap = new Map();
+      existingMaterials.rows.forEach((mat: any) => {
+        const key = `${mat.title.trim()}-${mat.type}`;
+        existingMap.set(key, mat);
+      });
+
+      // Process materials: update existing ones, create new ones
+      const materialsToUpdate: any[] = [];
+      const materialsToCreate: any[] = [];
+
+      materials.forEach((material: any, index: number) => {
+        const key = `${material.title.trim()}-${material.type}`;
+        const existing = existingMap.get(key);
+
+        if (existing) {
+          // Update existing material (preserve ID)
+          materialsToUpdate.push({
+            id: existing.id,
+            type: material.type,
+            title: material.title,
+            url: material.url,
+          });
+          // Remove from map so it doesn't get deleted
+          existingMap.delete(key);
+        } else {
+          // Create new material
+          materialsToCreate.push(material);
+        }
+      });
+
+      // Update existing materials that matched
+      for (const material of materialsToUpdate) {
+        await pool.query(
+          'UPDATE lesson_materials SET type = $1, title = $2, url = $3 WHERE id = $4',
+          [material.type, material.title, material.url, material.id]
+        );
+      }
 
       // Create new materials
-      if (materials.length > 0) {
+      if (materialsToCreate.length > 0) {
         const materialsQuery = `
           INSERT INTO lesson_materials (lesson_id, type, title, url)
-          VALUES ${materials.map((_: any, index: number) => `($${index * 4 + 1}, $${index * 4 + 2}, $${index * 4 + 3}, $${index * 4 + 4})`).join(', ')}
+          VALUES ${materialsToCreate.map((_: any, index: number) => `($${index * 4 + 1}, $${index * 4 + 2}, $${index * 4 + 3}, $${index * 4 + 4})`).join(', ')}
         `;
 
-        const materialsValues = materials.flatMap((material: any) => [
+        const materialsValues = materialsToCreate.flatMap((material: any) => [
           id,
           material.type,
           material.title,
@@ -252,7 +358,25 @@ export const updateLesson = async (req: Request, res: Response) => {
 
         await pool.query(materialsQuery, materialsValues);
       }
+
+      // Delete materials that are no longer in the updated list
+      const materialsToDelete = Array.from(existingMap.values()).map((mat: any) => mat.id);
+      if (materialsToDelete.length > 0) {
+        await pool.query(
+          `DELETE FROM lesson_materials WHERE id = ANY($1)`,
+          [materialsToDelete]
+        );
+      }
+
+      newMaterialCount = materials.length;
+    } else {
+      // If materials not provided in update, keep current count
+      newMaterialCount = currentMaterialCount;
     }
+
+    // Note: We no longer reset lesson_completed when new materials are added.
+    // Students who have completed a lesson should retain their completion status.
+    // They can choose to review new materials or not.
 
     // Fetch updated lesson with materials
     const fetchQuery = `
@@ -292,9 +416,12 @@ export const updateLessonStatus = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Lesson not found' });
     }
 
+    // Convert Malay status to English for DB
+    const dbStatus = reverseStatusMap[status as keyof typeof reverseStatusMap] || status;
+
     // Update lesson status
     const updateQuery = 'UPDATE lessons SET status = $1, updated_at = NOW() WHERE id = $2';
-    await pool.query(updateQuery, [status, id]);
+    await pool.query(updateQuery, [dbStatus, id]);
 
     res.json({ message: 'Lesson status updated successfully' });
   } catch (error) {

@@ -5,7 +5,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { CheckCircle, FileText, Video, AudioLines, Link, Presentation } from "lucide-react";
 import axios from "@/lib/axios";
 
@@ -30,19 +30,30 @@ interface LessonViewerProps {
   isOpen: boolean;
   onClose: () => void;
   onComplete: (lessonId: number) => void;
+  selectedYear?: number;
 }
 
-export function LessonViewer({ lesson, isOpen, onClose, onComplete }: LessonViewerProps) {
+export function LessonViewer({ lesson, isOpen, onClose, onComplete, selectedYear }: LessonViewerProps) {
   const [viewedMaterials, setViewedMaterials] = useState<Set<number>>(new Set());
 
-  // Load previously viewed materials when lesson opens
+  // Load previously viewed materials when lesson opens or when lesson changes
   useEffect(() => {
-    if (lesson && isOpen) {
+    if (lesson && isOpen && selectedYear) {
       const loadViewedMaterials = async () => {
         try {
-          const response = await axios.get(`/progress/material-progress?year=${parseInt(lesson.yearLevel.replace('Year ', ''))}&subject=${lesson.subject}&topic=${lesson.title}`);
+          console.log(`Fetching viewed materials for lesson: ${lesson.title}, year: ${selectedYear}, subject: ${lesson.subject}`);
+          const response = await axios.get(`/api/progress/material-progress?year=${selectedYear}&subject=${lesson.subject}&topic=${lesson.title}`);
           const materialsViewed = response.data.materialsViewed || [];
-          setViewedMaterials(new Set(materialsViewed));
+          console.log(`API Response - materialsViewed:`, materialsViewed);
+          console.log(`Current lesson materials:`, lesson.materials?.map(m => ({ id: m.id, title: m.title })));
+
+          // Check if any of the viewed materials still exist in current lesson materials
+          const validViewedMaterials = materialsViewed.filter((materialId: number) =>
+            lesson.materials?.some(m => m.id === materialId)
+          );
+          console.log(`Valid viewed materials (still exist in lesson):`, validViewedMaterials);
+
+          setViewedMaterials(new Set(validViewedMaterials));
         } catch (error) {
           console.error('Error loading material progress:', error);
           // Reset to empty set if error
@@ -51,22 +62,24 @@ export function LessonViewer({ lesson, isOpen, onClose, onComplete }: LessonView
       };
       loadViewedMaterials();
     }
-  }, [lesson, isOpen]);
+  }, [lesson, isOpen, selectedYear]);
 
   if (!lesson) return null;
 
   const handleViewMaterial = async (materialId: number) => {
+    if (!selectedYear) return;
     try {
       await axios.post('/progress/mark-material-viewed', {
-        year: parseInt(lesson.yearLevel.replace('Year ', '')),
+        year: selectedYear,
         subject: lesson.subject,
         topic: lesson.title,
         materialId
       });
       setViewedMaterials(prev => new Set(prev).add(materialId));
+      console.log(`Material ${materialId} marked as viewed for lesson ${lesson.title}`);
     } catch (error) {
       console.error('Error marking material as viewed:', error);
-      // Still mark as viewed locally for better UX
+      // Still mark as viewed locally for better UX, but log the error
       setViewedMaterials(prev => new Set(prev).add(materialId));
     }
   };
@@ -92,7 +105,7 @@ export function LessonViewer({ lesson, isOpen, onClose, onComplete }: LessonView
       try {
         // For uploaded files, use the backend route
         if (material.type !== "Link") {
-          const response = await axios.get(`/lessons/${lesson.id}/materials/${material.id}/view`, {
+          const response = await axios.get(`/api/lessons/${lesson.id}/materials/${material.id}/view`, {
             responseType: 'blob'
           });
           const blob = new Blob([response.data], { type: response.headers['content-type'] });
@@ -129,12 +142,15 @@ export function LessonViewer({ lesson, isOpen, onClose, onComplete }: LessonView
               <p className="text-sm text-gray-600">{lesson.subject} - {lesson.yearLevel}</p>
             </div>
           </DialogTitle>
+          <DialogDescription>
+            Sila pelajari semua bahan pembelajran untuk lengkapkan modul ini
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Lesson Description */}
           <div className="bg-gray-50 p-4 rounded-lg">
-            <h3 className="font-semibold mb-2">Penerangan</h3>
+            <h3 className="font-semibold mb-2">Info</h3>
             <p className="text-gray-700">{lesson.description}</p>
           </div>
 

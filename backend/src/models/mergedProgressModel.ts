@@ -40,7 +40,7 @@ export const getMergedUserProgress = async (user_id: number) => {
     SELECT l.title, l.subject, l.year_level, COUNT(lm.id) as material_count
     FROM lessons l
     LEFT JOIN lesson_materials lm ON l.id = lm.lesson_id
-    WHERE l.status = 'Published'
+    WHERE l.status = 'published'
     GROUP BY l.id, l.title, l.subject, l.year_level
   `);
 
@@ -97,7 +97,7 @@ export const getMergedUserProgress = async (user_id: number) => {
 export const ensureAllLessonsHaveProgress = async (user_id: number) => {
   // Get all published lessons
   const publishedLessons = await pool.query(
-    `SELECT subject, title, year_level FROM lessons WHERE status = 'Published' ORDER BY year_level, subject, lesson_order`
+    `SELECT subject, title, year_level FROM lessons WHERE status = 'published' ORDER BY year_level, subject, lesson_order`
   );
 
   // Group lessons by year and subject

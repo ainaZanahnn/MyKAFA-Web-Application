@@ -12,6 +12,7 @@ import type { User, RegisterFormData, AxiosError } from "./AuthContext";
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // REFRESH TOKEN function
   const refreshToken = async (): Promise<boolean> => {
@@ -21,7 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      const response = await axios.post("http://localhost:5000/api/auth/refresh", {
+      const response = await axios.post("/api/auth/refresh", {
         refreshToken: storedRefreshToken,
       });
 
@@ -34,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Update user state if needed
-      const verifyResponse = await axios.get("http://localhost:5000/api/auth/verify");
+      const verifyResponse = await axios.get("/api/auth/verify");
       const { user: userData } = verifyResponse.data;
 
       setUser({
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (token) {
         try {
           // Validate token with backend
-          const response = await axios.get("http://localhost:5000/api/auth/verify", {
+          const response = await axios.get("/api/auth/verify", {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -98,16 +99,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializeAuth();
   }, []);
 
-  // Set up axios response interceptor to handle 401 errors
+  // Set up axios response interceptor to handle 401 and 403 errors
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
       (response) => response,
-      (error) => {
+      async (error) => {
         if (error.response?.status === 401) {
           // Token expired or invalid, log out user
           setUser(null);
           localStorage.removeItem("token");
+          localStorage.removeItem("refreshToken");
           toast.error("Sesi anda telah tamat. Sila log masuk semula.");
+        } else if (error.response?.status === 403 && user && !error.config._retry) {
+          // Access denied - could be role verification issue for any user type, try to refresh user data
+          try {
+            const token = localStorage.getItem("token");
+            if (token) {
+              const response = await axios.get("/api/auth/verify", {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+              const { user: userData } = response.data;
+
+              // Update user state with fresh data
+              setUser({
+                username: userData.full_name,
+                email: userData.email,
+                userId: userData.id_pengguna,
+                role: userData.role,
+                id: userData.id,
+                full_name: userData.full_name,
+                id_pengguna: userData.id_pengguna,
+                tahun_darjah: userData.tahun_darjah,
+              });
+
+              // Trigger refresh for components that depend on user data
+              setRefreshTrigger(prev => prev + 1);
+
+              // Check if role changed
+              if (userData.role !== user.role) {
+                // Only show role change toast if the new role is valid
+                const validRoles = ['student', 'guardian', 'admin'];
+                if (validRoles.includes(userData.role)) {
+                  toast.warning(`Peranan anda telah bertukar kepada ${userData.role}.`);
+                }
+              }
+              // Removed session renewed toast to prevent spam
+
+              // Retry the original request with updated token (mark as retried to prevent infinite loop)
+              error.config._retry = true;
+              error.config.headers.Authorization = `Bearer ${token}`;
+              return axios(error.config);
+            }
+          } catch {
+            // Refresh failed, log out
+            setUser(null);
+            localStorage.removeItem("token");
+            localStorage.removeItem("refreshToken");
+            toast.error("Sesi anda telah tamat. Sila log masuk semula.");
+          }
+        } else if (error.response?.status === 500) {
+          // Internal server error
+          toast.error("Maaf, sistem bermasalah. (500)");
+        } else if (error.response?.status === 502) {
+          // Bad gateway
+          toast.error("Masalah pelayan. Cuba sebentar lagi. (502)");
+        } else if (error.response?.status === 503) {
+          // Service unavailable
+          toast.error("Gangguan sementara. Sila cuba lagi. (503)");
+        } else if (error.response?.status === 504) {
+          // Gateway timeout
+          toast.error("Sambungan lambat. Sila ulang semula. (504)");
+        } else if (error.response?.status === 429) {
+          // Too many requests
+          toast.error("Terlalu banyak permintaan. Sila tunggu sebentar.");
         }
         return Promise.reject(error);
       }
@@ -117,20 +183,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       axios.interceptors.response.eject(interceptor);
     };
-  }, []);
+  }, [user]);
 
   // LOGIN — now calls backend API
   const login = async (identifier: string, password: string) => {
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/auth/login",
+        "/api/auth/login",
         { identifier, password }
       );
 
       const { user, message } = response.data;
 
       // Update frontend state with user data from backend
-      setUser({
+      const userData = {
         username: user.full_name,
         email: user.email,
         userId: user.id_pengguna,
@@ -139,7 +205,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         full_name: user.full_name,
         id_pengguna: user.id_pengguna,
         tahun_darjah: user.tahun_darjah,
-      });
+      };
+      setUser(userData);
 
       // Store tokens in localStorage
       localStorage.setItem("token", response.data.token);
@@ -148,13 +215,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       toast.success(message);
-      return true;
+      return { success: true, user: userData };
     } catch (error: unknown) {
       console.error("Login error:", error);
       const axiosError = error as AxiosError;
       const message = axiosError.response?.data?.message || "Ralat semasa log masuk";
       toast.error(message);
-      return false;
+      return { success: false, user: null };
     }
   };
 
@@ -171,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // (A) Send data to backend
       const response = await axios.post(
-        "http://localhost:5000/api/auth/register",
+        "/api/auth/register",
         formData
       );
 
@@ -214,7 +281,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Provide all functions + user to app
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, register, refreshToken }}>
+    <AuthContext.Provider value={{ user, isLoading, refreshTrigger, login, logout, register, refreshToken }}>
       {children}
     </AuthContext.Provider>
   );

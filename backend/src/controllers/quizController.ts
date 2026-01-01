@@ -15,9 +15,22 @@ interface Quiz {
   year: number;
   subject: string;
   topic: string;
-  status: 'draft' | 'published' | 'archived';
+  status: 'draf' | 'diterbitkan' | 'diarkibkan';
   created_at: string;
 }
+
+// Status mapping between English (DB) and Malay (Frontend)
+const statusMap = {
+  'draft': 'draf',
+  'published': 'diterbitkan',
+  'archived': 'diarkibkan'
+};
+
+const reverseStatusMap = {
+  'draf': 'draft',
+  'diterbitkan': 'published',
+  'diarkibkan': 'archived'
+};
 
 // GET /api/admin/quizzes - Get all quizzes
 export const getQuizzes = async (req: Request, res: Response) => {
@@ -33,7 +46,10 @@ export const getQuizzes = async (req: Request, res: Response) => {
     `;
 
     const result = await pool.query(query);
-    const quizzes = result.rows;
+    const quizzes = result.rows.map(quiz => ({
+      ...quiz,
+      status: statusMap[quiz.status as keyof typeof statusMap] || quiz.status
+    }));
 
     res.json({ quizzes });
   } catch (error) {
@@ -68,7 +84,7 @@ export const createQuiz = async (req: Request, res: Response) => {
     // Insert quiz
     const quizQuery = `
       INSERT INTO quizzes (year, subject, topic, quiz_type, status, created_at)
-      VALUES ($1, $2, $3, $4, 'draft', NOW())
+      VALUES ($1, $2, $3, $4, 'published', NOW())
       RETURNING id
     `;
 
@@ -140,6 +156,7 @@ export const getQuizById = async (req: Request, res: Response) => {
 
     const quiz: Quiz = {
       ...quizResult.rows[0],
+      status: statusMap[quizResult.rows[0].status as keyof typeof statusMap] || quizResult.rows[0].status,
       questions: parsedQuestions
     };
 
@@ -156,14 +173,51 @@ export const updateQuiz = async (req: Request, res: Response) => {
   const { year, subject, topic, quizType, status, questions } = req.body;
 
   try {
+    // Build dynamic update query based on provided fields
+    const updateFields = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (year !== undefined && year !== "undefined") {
+      updateFields.push(`year = $${paramIndex++}`);
+      values.push(year);
+    }
+    if (subject !== undefined && subject !== "undefined") {
+      updateFields.push(`subject = $${paramIndex++}`);
+      values.push(subject);
+    }
+    if (topic !== undefined && topic !== "undefined") {
+      updateFields.push(`topic = $${paramIndex++}`);
+      values.push(topic);
+    }
+    if (quizType !== undefined && quizType !== "undefined") {
+      updateFields.push(`quiz_type = $${paramIndex++}`);
+      values.push(quizType);
+    }
+    if (status !== undefined && status !== "undefined") {
+      // Convert Malay status to English for database
+      const dbStatus = reverseStatusMap[status as keyof typeof reverseStatusMap] || status;
+      updateFields.push(`status = $${paramIndex++}`);
+      values.push(dbStatus);
+    }
+
+    // Always update updated_at
+    updateFields.push(`updated_at = NOW()`);
+
+    if (updateFields.length === 1) {
+      // Only updated_at was set, no actual changes
+      return res.json({ message: 'Quiz updated successfully' });
+    }
+
     // Update quiz
     const quizQuery = `
       UPDATE quizzes
-      SET year = $1, subject = $2, topic = $3, quiz_type = $4, status = $5, updated_at = NOW()
-      WHERE id = $6
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramIndex}
     `;
 
-    await pool.query(quizQuery, [year, subject, topic, quizType || 'mcq', status, id]);
+    values.push(id);
+    await pool.query(quizQuery, values);
 
     // Update questions if provided
     if (questions !== undefined) {

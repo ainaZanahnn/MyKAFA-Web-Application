@@ -49,7 +49,7 @@ export default function ManagePapers() {
   const fetchPapers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get("http://localhost:5000/api/upkk");
+      const response = await axios.get("/api/upkk");
       if (response.data.success) {
         setPapers(response.data.data);
       }
@@ -87,7 +87,7 @@ export default function ManagePapers() {
       let response;
       if (editingPaper) {
         response = await axios.put(
-          `http://localhost:5000/api/upkk/${editingPaper.id}`,
+          `/api/upkk/${editingPaper.id}`,
           formData,
           {
             headers: {
@@ -98,7 +98,7 @@ export default function ManagePapers() {
         );
       } else {
         response = await axios.post(
-          "http://localhost:5000/api/upkk",
+          "/api/upkk",
           formData,
           {
             headers: {
@@ -140,7 +140,7 @@ export default function ManagePapers() {
 
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.delete(`http://localhost:5000/api/upkk/${id}`, {
+      const response = await axios.delete(`/api/upkk/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -159,7 +159,7 @@ export default function ManagePapers() {
   const handleArchive = async (id: number) => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.patch(`http://localhost:5000/api/upkk/${id}/archive`, {}, {
+      const response = await axios.patch(`/api/upkk/${id}/archive`, {}, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

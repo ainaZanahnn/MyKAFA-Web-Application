@@ -10,7 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { kafaSubjects, yearLevels, type Subject } from "@/lib/kafa-config";
+import { kafaSubjects, yearLevels } from "../../lib/kafa-config";
+import type { Subject } from "../../lib/kafa-config";
 
 interface LessonManagementHeaderProps {
   selectedYear: string;
@@ -46,7 +47,7 @@ export function LessonManagementHeader({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {yearLevels.map((year) => (
+            {yearLevels.map((year: string) => (
               <SelectItem key={year} value={year}>
                 {year}
               </SelectItem>
@@ -56,11 +57,11 @@ export function LessonManagementHeader({
 
         <Select
           value={selectedSubject ? selectedSubject.name : "All"}
-          onValueChange={(value) => {
+          onValueChange={(value: string) => {
             if (value === "All") {
               onSubjectChange(null);
             } else {
-              const subject = kafaSubjects.find(s => s.name === value);
+              const subject = kafaSubjects.find((subject: Subject) => subject.name === value);
               if (subject) onSubjectChange(subject);
             }
           }}
@@ -70,7 +71,7 @@ export function LessonManagementHeader({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All">Semua</SelectItem>
-            {kafaSubjects.map((subject) => (
+            {kafaSubjects.map((subject: Subject) => (
               <SelectItem key={subject.id} value={subject.name}>
                 {subject.name}
               </SelectItem>
