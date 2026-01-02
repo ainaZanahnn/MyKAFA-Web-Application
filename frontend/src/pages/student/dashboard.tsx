@@ -2,60 +2,9 @@
 
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Banner } from "@/components/student/banner";
-import {
-  Users,
-  BookOpen,
-  HelpCircle,
-  FileQuestion,
-  Megaphone,
-  Activity,
-  UserCheck,
-  Shield,
-  GraduationCap,
-} from "lucide-react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
-
-const pieData = [
-  { name: "Pelajar", value: 850, color: "hsl(var(--chart-1))" },
-  { name: "Penjaga", value: 395, color: "hsl(var(--chart-2))" },
-];
-
-const dailyUserData = [
-  { name: "Mon", users: 245 },
-  { name: "Tue", users: 312 },
-  { name: "Wed", users: 189 },
-  { name: "Thu", users: 278 },
-  { name: "Fri", users: 356 },
-  { name: "Sat", users: 198 },
-  { name: "Sun", users: 167 },
-];
-
-const newArrivals = [
-  { id: 1, title: "Kertas UPKK Baru Ditambah", subtitle: "Modul Matematik" },
-  {
-    id: 2,
-    title: "Keputusan Kuiz Tersedia",
-    subtitle: "Kuiz Interaktif Sains",
-  },
-  { id: 3, title: "Pendaftaran Pengguna", subtitle: "5 Pelajar Baru Hari Ini" },
-  {
-    id: 4,
-    title: "Modul Dikemaskini",
-    subtitle: "Modul Pembelajaran Bahasa Inggeris",
-  },
-];
+import { Users, BookOpen, HelpCircle, FileQuestion } from "lucide-react";
 
 export default function Dashboard() {
   return (

@@ -4,44 +4,38 @@
 
 import { useEffect, useState } from "react";
 import { MessageSquare, Megaphone } from "lucide-react";
+import announcementService from "@/services/announcementService";
 
-type Announcement = {
+const PER_PAGE = 4;
+
+// Local interface for component usage
+interface AnnouncementItem {
   id: number;
   title: string;
   content: string;
   date: string;
   type: "announcement" | "feedback";
-  author_name?: string;
-};
-
-const PER_PAGE = 4;
+  author_name: string;
+}
 
 export default function Announcements() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
-        const response = await fetch("/api/announcements");
-        if (!response.ok) {
-          throw new Error("Failed to fetch announcements");
-        }
-        const data = await response.json();
-        if (data.success) {
-          // Transform the data to match the expected format
-          const transformedData = data.data.map((item: Record<string, unknown>) => ({
-            id: item.id as number,
-            title: item.title as string,
-            content: item.content as string,
-            date: item.date as string,
-            type: item.type as "announcement" | "feedback",
-            author_name: item.author_name as string,
-          }));
-          setAnnouncements(transformedData);
-        } else {
-          throw new Error(data.message || "Failed to fetch announcements");
-        }
+        const { data } = await announcementService.getAnnouncements();
+        // Transform the data to match the expected format
+        const transformedData: AnnouncementItem[] = data.map((item) => ({
+          id: item.id,
+          title: item.title,
+          content: item.content,
+          date: item.date,
+          type: item.type as "announcement" | "feedback",
+          author_name: "Tidak diketahui", // Default author name since it's not in the API response
+        }));
+        setAnnouncements(transformedData);
       } catch (err: unknown) {
         console.error("Error fetching announcements:", err);
       }
@@ -124,8 +118,7 @@ export default function Announcements() {
                   {feedback.content}
                 </p>
                 <div className="text-xs text-gray-400">
-                  Oleh {feedback.author_name || "Tidak diketahui"} •{" "}
-                  {feedback.date}
+                  Oleh {feedback.author_name} • {feedback.date}
                 </div>
               </div>
             </div>

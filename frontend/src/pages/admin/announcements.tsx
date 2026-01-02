@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/components/auth/useAuth";
 import { ChevronDown, Plus, Send } from "lucide-react";
-import axios, { AxiosError } from "axios";
+import announcementService from "@/services/announcementService";
 import { toast } from "react-toastify";
 
 type Announcement = {
@@ -47,9 +47,9 @@ export default function Announcements() {
 
   const fetchAnnouncements = async () => {
     try {
-      const response = await axios.get("/api/announcements");
+      const response = await announcementService.getAnnouncements();
       // Filter to show only announcements created by the current admin user
-      const adminAnnouncements = (response.data.data || []).filter(
+      const adminAnnouncements = (response.data || []).filter(
         (announcement: Announcement) =>
           announcement.author_id === user?.id &&
           announcement.type === "announcement"
@@ -57,8 +57,7 @@ export default function Announcements() {
       setAnnouncements(adminAnnouncements);
     } catch (error) {
       console.error("Error fetching announcements:", error);
-      const errorMessage = error instanceof AxiosError ? error.response?.data?.message || error.message : "Unknown error";
-      toast.error("Failed to fetch announcements: " + errorMessage);
+      toast.error("Failed to fetch announcements: " + (error as Error).message);
     }
   };
 
@@ -74,7 +73,7 @@ export default function Announcements() {
 
     setLoading(true);
     try {
-      const response = await axios.post("/api/announcements", {
+      const response = await announcementService.createAnnouncement({
         title: createForm.title,
         content: createForm.content,
         date: createForm.date,
@@ -83,7 +82,7 @@ export default function Announcements() {
         author_id: user?.id,
       });
 
-      if (response.data.success) {
+      if (response.success) {
         toast.success("Pengumuman berjaya dibuat!");
         setCreateForm({
           title: "",
@@ -94,12 +93,11 @@ export default function Announcements() {
         setShowCreateForm(false);
         fetchAnnouncements(); // Refresh the list
       } else {
-        throw new Error(response.data.message || "Failed to create announcement");
+        throw new Error(response.message || "Failed to create announcement");
       }
     } catch (error) {
       console.error("Error creating announcement:", error);
-      const errorMessage = error instanceof AxiosError ? error.response?.data?.message || error.message : "Unknown error";
-      toast.error("Ralat semasa membuat pengumuman: " + errorMessage);
+      toast.error("Ralat semasa membuat pengumuman: " + (error as Error).message);
     } finally {
       setLoading(false);
     }

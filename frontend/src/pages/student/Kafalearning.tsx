@@ -6,7 +6,8 @@ import { useState, useEffect } from "react";
 import { StudentLessonTable } from "@/components/student/studentlessontable";
 import type { Lesson } from "@/components/student/studentlessontable";
 import { useAuth } from "@/components/auth/useAuth";
-import axios from "@/lib/axios";
+import lessonService from "@/services/lessonService";
+import { progressService } from "@/services/progressService";
 import { playClickSound } from "@/lib/sound";
 
 
@@ -110,7 +111,7 @@ interface Subject {
 interface ProgressItem {
   year: number;
   subject: string;
-  topic_completed: boolean;
+  topic_completed?: boolean;
   topic_progress?: number;
 }
 
@@ -126,16 +127,16 @@ export function LearningKafa() {
   useEffect(() => {
     const fetchProgress = async () => {
       try {
-        const response = await axios.get(`/api/progress?t=${Date.now()}`);
-        setProgress(response.data.progress);
+        const response = await progressService.getProgress();
+        setProgress(response.progress);
 
         // If no progress exists, initialize it
-        if (response.data.progress.length === 0) {
+        if (response.progress.length === 0) {
           const registrationYear = parseInt(currentUser?.tahun_darjah || "1");
-          await axios.post('/api/progress/initialize', { registrationYear });
+          await progressService.initializeProgress(registrationYear);
           // Fetch progress again after initialization
-          const updatedResponse = await axios.get(`/api/progress?t=${Date.now()}`);
-          setProgress(updatedResponse.data.progress);
+          const updatedResponse = await progressService.getProgress();
+          setProgress(updatedResponse.progress);
         }
       } catch (error) {
         console.error('Error fetching progress:', error);
@@ -149,16 +150,26 @@ export function LearningKafa() {
       if (selectedYear && selectedSubject) {
         setLoading(true);
         try {
-          const response = await axios.get('/api/lessons', {
-            params: {
-              subject: selectedSubject.name,
-              year_level: `Year ${selectedYear.year}`
-            }
+          const { data: fetchedLessons } = await lessonService.getLessons({
+            subject: selectedSubject.name,
+            year_level: `Year ${selectedYear.year}`
           });
-          console.log('API Response:', response.data);
+          console.log('API Response:', fetchedLessons);
           console.log('Selected subject:', selectedSubject.name);
           console.log('Selected year level:', `Year ${selectedYear.year}`);
-          setLessons(response.data.data || []);
+
+          // Transform lessons to match the expected Lesson type
+          const transformedLessons = (fetchedLessons || []).map(lesson => ({
+            ...lesson,
+            materials: lesson.materials.map(material => ({
+              id: material.id || 0, // Ensure id is not undefined
+              type: material.type as "PDF" | "PPT" | "Video" | "Audio" | "Link",
+              title: material.title,
+              url: material.url
+            }))
+          }));
+
+          setLessons(transformedLessons);
         } catch (error) {
           console.error('Error fetching lessons:', error);
           setLessons([]);
@@ -357,8 +368,8 @@ export function LearningKafa() {
                 // Refresh progress data with cache busting
                 const fetchUpdatedProgress = async () => {
                   try {
-                    const response = await axios.get(`/api/progress?t=${Date.now()}`);
-                    setProgress(response.data.progress);
+                    const response = await progressService.getProgress();
+                    setProgress(response.progress);
                     // Trigger lessons refresh to update material progress
                     setLessonsRefreshTrigger(prev => prev + 1);
                   } catch (error) {

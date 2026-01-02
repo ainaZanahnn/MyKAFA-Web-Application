@@ -3,7 +3,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import type React from "react";
-import axios from "axios";
+import axios from "@/lib/axios";
 import { toast } from "react-toastify";
 
 import { Card, CardContent } from "@/components/ui/card";

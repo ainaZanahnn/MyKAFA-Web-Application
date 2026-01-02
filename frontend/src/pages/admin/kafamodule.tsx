@@ -24,7 +24,7 @@ import {
 import { LessonTable } from "@/components/admin/lessontable";
 import type { Lesson } from "@/components/admin/lessontable";
 import { Textarea } from "@/components/ui/textarea";
-import axios from "@/lib/axios";
+import lessonService from "@/services/lessonService";
 import { toast } from "react-toastify";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -58,14 +58,7 @@ const yearMapping = {
   "Tahun 6": "Year 6",
 };
 
-const reverseYearMapping = {
-  "Year 1": "Tahun 1",
-  "Year 2": "Tahun 2",
-  "Year 3": "Tahun 3",
-  "Year 4": "Tahun 4",
-  "Year 5": "Tahun 5",
-  "Year 6": "Tahun 6",
-};
+
 
 export function LearningModuleManagement() {
   // Start with default selections
@@ -93,19 +86,18 @@ export function LearningModuleManagement() {
     const fetchLessons = async () => {
       try {
         const englishYear = yearMapping[selectedYear as keyof typeof yearMapping] || selectedYear;
-        let url = `/api/lessons?year_level=${englishYear}&page=${currentPage}&limit=${itemsPerPage}`;
-        if (selectedSubject) {
-          url += `&subject=${selectedSubject.name}`;
-        }
-        const response = await axios.get(url);
-        // Map yearLevel back to Malay for display
-        const mappedLessons = (response.data.data || []).map((lesson: Lesson) => ({
-          ...lesson,
-          yearLevel: reverseYearMapping[lesson.yearLevel as keyof typeof reverseYearMapping] || lesson.yearLevel
-        }));
+        const params = {
+          year_level: englishYear,
+          page: currentPage,
+          limit: itemsPerPage,
+          ...(selectedSubject && { subject: selectedSubject.name })
+        };
+        const response = await lessonService.getLessons(params);
+        // Backend already maps yearLevel to Malay
+        const mappedLessons = response.data || [];
         setLessons(mappedLessons);
-        setTotalPages(response.data.pagination?.totalPages || 1);
-        setTotalLessons(response.data.pagination?.total || 0);
+        setTotalPages(response.pagination?.totalPages || 1);
+        setTotalLessons(response.pagination?.total || 0);
       } catch (error) {
         console.error('Error fetching lessons:', error);
         toast.error('Gagal memuatkan pelajaran');
@@ -119,7 +111,7 @@ export function LearningModuleManagement() {
 
   const updateLessonStatus = async (lessonId: number, newStatus: string) => {
     try {
-      await axios.patch(`/api/lessons/${lessonId}/status`, { status: newStatus });
+      await lessonService.updateLessonStatus(lessonId, newStatus);
       setLessons((prev) =>
         prev.map((lesson) =>
           lesson.id === lessonId ? { ...lesson, status: newStatus } : lesson
@@ -147,37 +139,27 @@ export function LearningModuleManagement() {
     if (!editingLesson) return;
 
     try {
-      const formData = new FormData();
+      const updateData = {
+        subject: dialogSubject.name,
+        title: lessonTitle,
+        description: lessonDescription,
+        year_level: yearMapping[dialogYear as keyof typeof yearMapping] || dialogYear,
+        status: lessonStatus,
+        lesson_order: lessonOrder || 1,
+        materials: materials.map(material => ({
+          type: material.type,
+          title: material.title,
+          url: material.link || undefined
+        }))
+      };
 
-                        // Add lesson data
-                        formData.append('subject', dialogSubject.name);
-      formData.append('title', lessonTitle);
-      formData.append('description', lessonDescription);
-      formData.append('year_level', yearMapping[dialogYear as keyof typeof yearMapping] || dialogYear);
-      formData.append('status', lessonStatus);
-      formData.append('lesson_order', (lessonOrder || 1).toString());
+      const files = materials.filter(m => m.file).map(m => m.file!);
 
-      // Add materials data
-      materials.forEach((material, index) => {
-        formData.append(`materials[${index}][type]`, material.type);
-        formData.append(`materials[${index}][title]`, material.title);
-        if (material.link) {
-          formData.append(`materials[${index}][url]`, material.link);
-        }
-        if (material.file) {
-          formData.append('files', material.file);
-        }
-      });
-
-      const response = await axios.put(`/api/lessons/${editingLesson.id}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await lessonService.updateLesson(editingLesson.id, updateData, files);
 
       setLessons((prev) =>
         prev.map((lesson) =>
-          lesson.id === editingLesson.id ? response.data : lesson
+          lesson.id === editingLesson.id ? response as Lesson : lesson
         )
       );
 
@@ -436,34 +418,24 @@ export function LearningModuleManagement() {
                     </Button>
                     <Button onClick={async () => {
                       try {
-                        const formData = new FormData();
+                        const createData = {
+                          subject: dialogSubject.name,
+                          title: lessonTitle,
+                          description: lessonDescription,
+                          year_level: yearMapping[dialogYear as keyof typeof yearMapping] || dialogYear,
+                          status: lessonStatus,
+                          lesson_order: lessonOrder || 1,
+                          materials: materials.map(material => ({
+                            type: material.type,
+                            title: material.title,
+                            url: material.link || undefined
+                          }))
+                        };
 
-                        // Add lesson data
-                        formData.append('subject', dialogSubject.name);
-                        formData.append('title', lessonTitle);
-                        formData.append('description', lessonDescription);
-                        formData.append('year_level', yearMapping[dialogYear as keyof typeof yearMapping] || dialogYear);
-                        formData.append('status', lessonStatus);
-                        formData.append('lesson_order', (lessonOrder || 1).toString());
+                        const files = materials.filter(m => m.file).map(m => m.file!);
 
-                        // Add materials data
-                        materials.forEach((material, index) => {
-                          formData.append(`materials[${index}][type]`, material.type);
-                          formData.append(`materials[${index}][title]`, material.title);
-                          if (material.link) {
-                            formData.append(`materials[${index}][url]`, material.link);
-                          }
-                          if (material.file) {
-                            formData.append('files', material.file);
-                          }
-                        });
-
-                        const response = await axios.post('/api/lessons', formData, {
-                          headers: {
-                            'Content-Type': 'multipart/form-data',
-                          },
-                        });
-                        setLessons((prev) => [...prev, response.data]);
+                        const response = await lessonService.createLesson(createData, files);
+                        setLessons((prev) => [...prev, response as Lesson]);
 
                         // Reset form
                         setLessonTitle("");
@@ -674,9 +646,7 @@ export function LearningModuleManagement() {
               </DialogContent>
             </Dialog>
           </div>
-
-
-
+          
           {/* Lesson Table Component */}
           <LessonTable
             lessons={lessons}
@@ -685,7 +655,7 @@ export function LearningModuleManagement() {
             onDeleteLesson={async (lessonId: number) => {
               if (window.confirm('Are you sure you want to delete this lesson?')) {
                 try {
-                  await axios.delete(`/api/lessons/${lessonId}`);
+                  await lessonService.deleteLesson(lessonId);
                   setLessons((prev) => prev.filter((lesson) => lesson.id !== lessonId));
                   toast.success('Lesson deleted successfully');
                 } catch (error) {

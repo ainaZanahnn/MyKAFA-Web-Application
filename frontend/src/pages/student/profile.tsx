@@ -3,7 +3,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import type React from "react";
-import axios from "axios";
+import axios from "@/lib/axios";
 import { toast } from "react-toastify";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -37,7 +37,7 @@ export function ProfileStudent() {
     const fetchUserProfile = async () => {
       try {
         const response = await axios.get(
-          "/api/users/profile",
+          "/users/profile",
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -142,7 +142,7 @@ export function ProfileStudent() {
       }
 
       const response = await axios.put(
-        "/api/users/profile",
+        "/users/profile",
         updates,
         {
           headers: {
@@ -191,7 +191,7 @@ export function ProfileStudent() {
         formData.append("profilePicture", file);
 
         const response = await axios.put(
-          "/api/users/profile/picture",
+          "/users/profile/picture",
           formData,
           {
             headers: {

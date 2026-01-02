@@ -11,25 +11,11 @@ import { LessonViewer } from "./LessonViewer";
 import { AdaptiveQuizPlayer } from "@/components/quiz/AdaptiveQuizPlayer";
 import { defaultAdaptiveSettings } from "@/lib/quiz-constants";
 import type { QuizSummary, Question } from "@/lib/AdaptiveQuizEngine";
-import axios from "@/lib/axios";
+import { progressService } from "@/services/progressService";
+import quizService from "@/services/quizService";
 import { toast } from "react-toastify";
 import { useAuth } from "@/components/auth/useAuth";
-
-export type Lesson = {
-  id: number;
-  subject: string;
-  title: string;
-  description: string;
-  materials: {
-    id: number;
-    type: "PDF" | "PPT" | "Video" | "Audio" | "Link";
-    title: string;
-    url?: string;
-  }[];
-  yearLevel: string;
-  status: string;
-  order: number;
-};
+import type { Lesson } from "@/services/lessonService";
 
 export type Quiz = {
   id: number;
@@ -81,8 +67,7 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
       }
 
       try {
-        const response = await axios.get(`/api/progress?t=${Date.now()}`);
-        const progress: StudentProgress[] = response.data.progress;
+        const { progress } = await progressService.getProgress();
 
         // Filter progress for the selected year and subject
         const relevantProgress = progress.filter((p: StudentProgress) =>
@@ -106,20 +91,22 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
 
         // Fetch material progress for each lesson
         const materialProgressData: { [lessonId: number]: { viewed: number; total: number } } = {};
-        for (const lesson of lessons) {
-          try {
-            const materialResponse = await axios.get(`/api/progress/material-progress?year=${selectedYear}&subject=${selectedSubject}&topic=${lesson.title}`);
-            const materialsViewed = materialResponse.data.materialsViewed || [];
-            materialProgressData[lesson.id] = {
-              viewed: materialsViewed.length,
-              total: lesson.materials?.length || 0
-            };
-          } catch (error) {
-            console.error(`Error fetching material progress for lesson ${lesson.id}:`, error);
-            materialProgressData[lesson.id] = {
-              viewed: 0,
-              total: lesson.materials?.length || 0
-            };
+        if (selectedYear && selectedSubject) {
+          for (const lesson of lessons) {
+            try {
+              const materialResponse = await progressService.getMaterialProgress(selectedYear!, selectedSubject!, lesson.title);
+              const materialsViewed = materialResponse.materialsViewed || [];
+              materialProgressData[lesson.id] = {
+                viewed: materialsViewed.length,
+                total: lesson.materials?.length || 0
+              };
+            } catch (error) {
+              console.error(`Error fetching material progress for lesson ${lesson.id}:`, error);
+              materialProgressData[lesson.id] = {
+                viewed: 0,
+                total: lesson.materials?.length || 0
+              };
+            }
           }
         }
         setMaterialProgress(materialProgressData);
@@ -144,11 +131,12 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
   };
 
   const refreshMaterialProgress = async () => {
+    if (!selectedYear || !selectedSubject) return;
     const materialProgressData: { [lessonId: number]: { viewed: number; total: number } } = {};
     for (const lesson of lessons) {
       try {
-        const materialResponse = await axios.get(`/api/progress/material-progress?year=${selectedYear}&subject=${selectedSubject}&topic=${lesson.title}`);
-        const materialsViewed = materialResponse.data.materialsViewed || [];
+        const materialResponse = await progressService.getMaterialProgress(selectedYear, selectedSubject, lesson.title);
+        const materialsViewed = materialResponse.materialsViewed || [];
         materialProgressData[lesson.id] = {
           viewed: materialsViewed.length,
           total: lesson.materials?.length || 0
@@ -169,11 +157,7 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
     if (!lesson || !selectedYear || !selectedSubject) return;
 
     try {
-      await axios.post('/api/progress/complete-topic', {
-        year: selectedYear,
-        subject: selectedSubject,
-        topic: lesson.title
-      });
+      await progressService.completeTopic(selectedYear, selectedSubject, lesson.title);
       setCompletedLessons(prev => new Set(prev).add(lessonId));
       toast.success('Lesson completed successfully!');
 
@@ -194,10 +178,21 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
     if (!selectedYear || !selectedSubject) return;
 
     try {
-      const response = await axios.get(`/api/quizzes/student/${selectedYear}/${selectedSubject}/${lesson.title}`);
-      const quiz = response.data.quiz;
-      if (quiz && quiz.questions && quiz.questions.length > 0) {
-        setQuizQuestions(quiz.questions);
+      const { quiz, success } = await quizService.getStudentQuiz(selectedYear, selectedSubject, lesson.title);
+      if (success && quiz && quiz.questions && quiz.questions.length > 0) {
+        // Transform quiz questions to match AdaptiveQuizEngine Question interface
+        const transformedQuestions: Question[] = quiz.questions.map((q, index) => ({
+          id: q.id?.toString() || `question-${index}`,
+          text: q.questionText,
+          options: q.options,
+          correctAnswer: Array.isArray(q.correctAnswers) ? q.correctAnswers[0] : q.correctAnswers,
+          difficulty: q.difficulty,
+          topic: lesson.title,
+          hints: q.hints || [],
+          timeLimit: 60, // Default time limit
+          points: 10 // Default points
+        }));
+        setQuizQuestions(transformedQuestions);
         setSelectedQuizLesson(lesson);
         setShowQuiz(true);
       } else {

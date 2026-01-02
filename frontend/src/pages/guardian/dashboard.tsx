@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/components/auth/useAuth";
 import { MessageSquare, Send, Plus } from "lucide-react";
+import announcementService from "@/services/announcementService";
 
 interface Feedback {
   id: string;
@@ -34,22 +35,17 @@ const GuardianDashboard = () => {
   useEffect(() => {
     const fetchFeedbacks = async () => {
       try {
-        const response = await fetch(
-          "/api/announcements/feedback"
-        );
-        if (response.ok) {
-          const data = await response.json();
-          // Filter feedbacks by current guardian and sort by date descending
-          console.log("Fetched feedbacks:", data.data); // Debug log
-          const guardianFeedbacks = ((data.data || []) as Feedback[])
-            .filter((feedback) => feedback.author_id === String(user?.id))
-            .sort(
-              (a, b) =>
-                new Date(b.date).getTime() - new Date(a.date).getTime()
-            )
-            .slice(0, 2); // Keep only 2 latest
-          setFeedbacks(guardianFeedbacks);
-        }
+        const { data } = await announcementService.getAnnouncements();
+        // Filter feedbacks by current guardian and sort by date descending
+        console.log("Fetched feedbacks:", data); // Debug log
+        const guardianFeedbacks = data
+          .filter((feedback) => feedback.type === "feedback" && feedback.author_id === String(user?.id))
+          .sort(
+            (a, b) =>
+              new Date(b.date).getTime() - new Date(a.date).getTime()
+          )
+          .slice(0, 2); // Keep only 2 latest
+        setFeedbacks(guardianFeedbacks);
       } catch (error) {
         console.error("Error fetching feedbacks:", error);
       }
@@ -70,26 +66,16 @@ const GuardianDashboard = () => {
 
     setLoading(true);
     try {
-      const response = await fetch("/api/announcements", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: feedbackForm.title,
-          content: feedbackForm.content,
-          date: feedbackForm.date,
-          type: "feedback",
-          author_id: user?.id, // Assuming user.id is available from auth context
-        }),
+      const { success, message } = await announcementService.createAnnouncement({
+        title: feedbackForm.title,
+        content: feedbackForm.content,
+        date: feedbackForm.date,
+        type: "feedback",
+        author_id: user?.id,
+        target: "semua", // Default target for feedback
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to create feedback");
-      }
-
-      const data = await response.json();
-      if (data.success) {
+      if (success) {
         alert("Maklum balas berjaya dihantar!");
         setFeedbackForm({
           title: "",
@@ -98,7 +84,7 @@ const GuardianDashboard = () => {
         });
         setShowFeedbackForm(false);
       } else {
-        throw new Error(data.message || "Failed to create feedback");
+        throw new Error(message || "Failed to create feedback");
       }
     } catch (error: unknown) {
       console.error("Error creating feedback:", error);

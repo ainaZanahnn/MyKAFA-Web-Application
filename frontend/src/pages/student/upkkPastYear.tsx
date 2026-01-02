@@ -1,7 +1,7 @@
 /** @format */
 
 import { useState, useEffect, useMemo } from "react";
-import axios from "@/lib/axios";
+import upkkService, { type ApiPaper, type Paper } from "@/services/upkkService";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   BookOpen,
@@ -18,31 +18,7 @@ import {
 } from "lucide-react";
 import PaperModal from "@/components/upkk/PaperModal";
 
-interface ApiPaper {
-  id: number;
-  year: string;
-  subject: string;
-  type?: string;
-  file_path?: string;
-  status?: string;
-  downloads?: number;
-  color?: string;
-  created_at?: string;
-  updated_at?: string;
-}
 
-interface Paper {
-  id: string;
-  year: number;
-  subject: string;
-  type?: string;
-  file_path?: string;
-  status?: string;
-  downloads?: number;
-  color: string;
-  created_at?: string;
-  updated_at?: string;
-}
 
 const ITEMS_PER_PAGE = 9;
 
@@ -82,12 +58,12 @@ export default function KertasSoalanUPKK() {
   const fetchPapers = async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get("/api/upkk");
+      const response = await upkkService.getPapers();
 
-      if (response.data.success && Array.isArray(response.data.data) && response.data.data.length > 0) {
+      if (response.success && Array.isArray(response.data) && response.data.length > 0) {
         // Map API data to our Paper interface
         setPapers(
-          response.data.data.map((paper: ApiPaper) => ({
+          response.data.map((paper: ApiPaper) => ({
             ...paper,
             id: paper.id.toString(), // Convert id to string
             year: parseInt(paper.year), // Convert year to number
@@ -161,16 +137,10 @@ export default function KertasSoalanUPKK() {
     try {
       if (paper.file_path) {
         // Trigger download via POST request (increments download count)
-        const response = await axios.post(
-          `/api/upkk/${paper.id}/download`,
-          {},
-          {
-            responseType: "blob", // Important for file downloads
-          }
-        );
+        const blob = await upkkService.downloadPaper(paper.id);
 
         // Create download link and trigger download
-        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const url = window.URL.createObjectURL(new Blob([blob]));
         const link = document.createElement("a");
         link.href = url;
         link.setAttribute(

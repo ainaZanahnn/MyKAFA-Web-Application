@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import axios from "axios";
+import userService from "@/services/userService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -76,25 +76,20 @@ export default function UserManagement() {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get("/api/users", {
-        params: {
-          role:
-            userType === "all"
-              ? undefined
-              : userType === "pelajar"
-              ? "student"
-              : "guardian",
-          page: currentPage,
-          limit: itemsPerPage,
-          search: searchQuery || undefined,
-        },
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+      const response = await userService.getUsers({
+        role:
+          userType === "all"
+            ? undefined
+            : userType === "pelajar"
+            ? "student"
+            : "guardian",
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchQuery || undefined,
       });
-      setUsers(response.data.data || []);
-      setTotalPages(response.data.pagination?.totalPages || 1);
-      setTotalUsers(response.data.pagination?.total || 0);
+      setUsers(response.data || []);
+      setTotalPages(response.pagination?.totalPages || 1);
+      setTotalUsers(response.pagination?.total || 0);
     } catch (error: unknown) {
       console.error("Error fetching users:", error);
       toast.error("Gagal mendapatkan data pengguna");
@@ -105,7 +100,7 @@ export default function UserManagement() {
 
   useEffect(() => {
     fetchUsers();
-  }, [userType, currentPage]);
+  }, [userType, currentPage, fetchUsers]);
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -122,7 +117,7 @@ export default function UserManagement() {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchQuery]); // Removed fetchUsers from dependencies to prevent infinite loop
+  }, [searchQuery, fetchUsers]);
 
   const handleViewUser = (user: User) => {
     setSelectedUser(user);
@@ -131,15 +126,7 @@ export default function UserManagement() {
 
   const handleSuspendUser = async (user: User) => {
     try {
-      await axios.patch(
-        `http://localhost:5000/api/users/${user.id}/suspend`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
+      await userService.suspendUser(user.id);
       toast.success("Status pengguna berjaya dikemaskini");
       fetchUsers(); // Refresh data
     } catch (error: unknown) {
@@ -157,11 +144,7 @@ export default function UserManagement() {
     if (!userToDelete) return;
 
     try {
-      await axios.delete(`/api/users/${userToDelete.id}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+      await userService.deleteUser(userToDelete.id);
       toast.success("Pengguna berjaya dipadam");
       setIsDeleteConfirmOpen(false);
       setUserToDelete(null);

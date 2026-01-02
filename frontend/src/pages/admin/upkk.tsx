@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import axios from "@/lib/axios";
+import upkkService from "@/services/upkkService";
 import { Plus, Loader2 } from "lucide-react";
 
 type Paper = {
@@ -49,9 +49,14 @@ export default function ManagePapers() {
   const fetchPapers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get("/api/upkk");
-      if (response.data.success) {
-        setPapers(response.data.data);
+      const response = await upkkService.getPapers();
+      if (response.success) {
+        setPapers((response.data || []).map(paper => ({
+          ...paper,
+          type: paper.type || '',
+          status: paper.status || 'Active',
+          downloads: paper.downloads || 0,
+        })));
       }
     } catch (err: unknown) {
       setError("Gagal memuatkan kertas soalan");
@@ -85,33 +90,23 @@ export default function ManagePapers() {
 
       let response;
       if (editingPaper) {
-        response = await axios.put(
-          `/api/upkk/${editingPaper.id}`,
-          formData,
-          {
-            headers: {
-              "Content-Type": "multipart/form-data",
-            },
-          }
-        );
+        response = await upkkService.updatePaper(editingPaper.id, formData);
       } else {
-        response = await axios.post(
-          "/api/upkk",
-          formData,
-          {
-            headers: {
-              "Content-Type": "multipart/form-data",
-            },
-          }
-        );
+        response = await upkkService.createPaper(formData);
       }
 
-      if (response.data.success) {
+      if (response.success && response.data) {
+        const paperData = {
+          ...response.data,
+          type: response.data.type || '',
+          status: response.data.status || 'Active',
+          downloads: response.data.downloads || 0,
+        };
         if (editingPaper) {
-          setPapers(papers.map((p) => p.id === editingPaper.id ? response.data.data : p));
+          setPapers(papers.map((p) => p.id === editingPaper.id ? paperData : p));
           alert("Kertas soalan berjaya dikemaskini!");
         } else {
-          setPapers([...papers, response.data.data]);
+          setPapers([...papers, paperData]);
           alert("Kertas soalan berjaya ditambah!");
         }
         setNewPaper({
@@ -136,9 +131,9 @@ export default function ManagePapers() {
     if (!confirm("Adakah anda pasti mahu memadam kertas soalan ini?")) return;
 
     try {
-      const response = await axios.delete(`/api/upkk/${id}`);
+      const response = await upkkService.deletePaper(id);
 
-      if (response.data.success) {
+      if (response.success) {
         setPapers(papers.filter((p) => p.id !== id));
         alert("Kertas soalan berjaya dipadam!");
       }
@@ -150,9 +145,9 @@ export default function ManagePapers() {
 
   const handleArchive = async (id: number) => {
     try {
-      const response = await axios.patch(`/api/upkk/${id}/archive`, {});
+      const response = await upkkService.archivePaper(id);
 
-      if (response.data.success) {
+      if (response.success) {
         setPapers(papers.map((p) => p.id === id ? { ...p, status: "Archived" } : p));
         alert("Kertas soalan berjaya diarkib!");
       }
