@@ -1,7 +1,7 @@
 /** @format */
 
 import { useState, useEffect, useMemo } from "react";
-import axios from "axios";
+import axios from "@/lib/axios";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   BookOpen,

@@ -40,18 +40,20 @@ export function ProfileAccount() {
           }
         );
 
-        const user = response.data.data;
-        setUserData({
-          id: user.id,
-          fullName: user.full_name,
-          email: user.email,
-          userId: user.id_pengguna,
-          state: user.negeri,
-          phoneNumber: user.telefon || "",
-          password: "************",
-          relationshipType: "Ibu Bapa", // Default value, could be stored in DB if needed
-          profilePicture: "",
-        });
+        const user = response.data?.data;
+        if (user) {
+          setUserData({
+            id: user.id || 0,
+            fullName: user.full_name || "",
+            email: user.email || "",
+            userId: user.id_pengguna || "",
+            state: user.negeri || "",
+            phoneNumber: user.telefon || "",
+            password: "************",
+            relationshipType: "Ibu Bapa", // Default value, could be stored in DB if needed
+            profilePicture: "",
+          });
+        }
       } catch (error: unknown) {
         console.error("Error fetching user profile:", error);
         toast.error("Gagal mendapatkan data profil");
@@ -112,7 +114,7 @@ export function ProfileAccount() {
       }
 
       const response = await axios.put(
-        "/api/users/profile",
+        "users/profile",
         updates,
         {
           headers: {
@@ -121,15 +123,17 @@ export function ProfileAccount() {
         }
       );
 
-      const updatedUser = response.data.data;
-      setUserData({
-        ...userData,
-        fullName: updatedUser.full_name,
-        email: updatedUser.email,
-        userId: updatedUser.id_pengguna,
-        state: updatedUser.negeri,
-        phoneNumber: updatedUser.telefon || "",
-      });
+      const updatedUser = response.data?.data;
+      if (updatedUser) {
+        setUserData({
+          ...userData,
+          fullName: updatedUser.full_name || "",
+          email: updatedUser.email || "",
+          userId: updatedUser.id_pengguna || "",
+          state: updatedUser.negeri || "",
+          phoneNumber: updatedUser.telefon || "",
+        });
+      }
 
       toast.success("Profil berjaya dikemaskini!");
       setIsEditing(false);

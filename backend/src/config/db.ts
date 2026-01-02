@@ -13,7 +13,7 @@ const pool = new Pool({
   user: process.env.PGUSER,
   password: process.env.PGPASSWORD,
   // Connection settings to handle timeouts and reconnections
-  connectionTimeoutMillis: 2000, // How long to wait for connection
+  connectionTimeoutMillis: 10000, // How long to wait for connection (increased from 2000ms)
   idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
   max: 20, // Maximum number of clients in pool
   allowExitOnIdle: true, // Allow pool to close when idle

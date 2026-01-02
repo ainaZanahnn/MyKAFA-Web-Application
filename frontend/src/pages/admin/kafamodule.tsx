@@ -93,7 +93,7 @@ export function LearningModuleManagement() {
     const fetchLessons = async () => {
       try {
         const englishYear = yearMapping[selectedYear as keyof typeof yearMapping] || selectedYear;
-        let url = `lessons?year_level=${englishYear}&page=${currentPage}&limit=${itemsPerPage}`;
+        let url = `/api/lessons?year_level=${englishYear}&page=${currentPage}&limit=${itemsPerPage}`;
         if (selectedSubject) {
           url += `&subject=${selectedSubject.name}`;
         }
@@ -119,7 +119,7 @@ export function LearningModuleManagement() {
 
   const updateLessonStatus = async (lessonId: number, newStatus: string) => {
     try {
-      await axios.patch(`lessons/${lessonId}/status`, { status: newStatus });
+      await axios.patch(`/api/lessons/${lessonId}/status`, { status: newStatus });
       setLessons((prev) =>
         prev.map((lesson) =>
           lesson.id === lessonId ? { ...lesson, status: newStatus } : lesson
@@ -169,7 +169,7 @@ export function LearningModuleManagement() {
         }
       });
 
-      const response = await axios.put(`lessons/${editingLesson.id}`, formData, {
+      const response = await axios.put(`/api/lessons/${editingLesson.id}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -259,7 +259,7 @@ export function LearningModuleManagement() {
               <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="mb-4"><center>Tambah Pelajaran Baru</center></DialogTitle>
-                  <DialogDescription id="add-lesson-description">
+                  <DialogDescription>
                     Isi borang di bawah untuk menambah pelajaran baru ke dalam sistem.
                   </DialogDescription>
                 </DialogHeader>
@@ -458,7 +458,7 @@ export function LearningModuleManagement() {
                           }
                         });
 
-                        const response = await axios.post('lessons', formData, {
+                        const response = await axios.post('/api/lessons', formData, {
                           headers: {
                             'Content-Type': 'multipart/form-data',
                           },
@@ -685,7 +685,7 @@ export function LearningModuleManagement() {
             onDeleteLesson={async (lessonId: number) => {
               if (window.confirm('Are you sure you want to delete this lesson?')) {
                 try {
-                  await axios.delete(`lessons/${lessonId}`);
+                  await axios.delete(`/api/lessons/${lessonId}`);
                   setLessons((prev) => prev.filter((lesson) => lesson.id !== lessonId));
                   toast.success('Lesson deleted successfully');
                 } catch (error) {

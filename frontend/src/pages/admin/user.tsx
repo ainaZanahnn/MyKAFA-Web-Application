@@ -92,9 +92,9 @@ export default function UserManagement() {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
-      setUsers(response.data.data);
-      setTotalPages(response.data.pagination.totalPages);
-      setTotalUsers(response.data.pagination.total);
+      setUsers(response.data.data || []);
+      setTotalPages(response.data.pagination?.totalPages || 1);
+      setTotalUsers(response.data.pagination?.total || 0);
     } catch (error: unknown) {
       console.error("Error fetching users:", error);
       toast.error("Gagal mendapatkan data pengguna");

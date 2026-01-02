@@ -45,26 +45,28 @@ export function ProfileStudent() {
           }
         );
 
-        const user = response.data.data;
-        setUserData({
-          id: user.id,
-          fullName: user.full_name,
-          email: user.email,
-          userId: user.id_pengguna,
-          state: user.negeri,
-          grade: user.tahun_darjah || "",
-          schoolType: user.jenis_sekolah || "",
-          schoolName: user.nama_sekolah || "",
-          phoneNumber: user.telefon || "",
-          password: "************",
-          class: "Kelas 1A/2025",
-          achievements: 3,
-          totalAchievements: 600,
-          profilePicture: user.profile_picture
-            ? `/${user.profile_picture}`
-            : "",
-        });
-      } catch (error: any) {
+        const user = response.data?.data;
+        if (user) {
+          setUserData({
+            id: user.id || 0,
+            fullName: user.full_name || "",
+            email: user.email || "",
+            userId: user.id_pengguna || "",
+            state: user.negeri || "",
+            grade: user.tahun_darjah || "",
+            schoolType: user.jenis_sekolah || "",
+            schoolName: user.nama_sekolah || "",
+            phoneNumber: user.telefon || "",
+            password: "************",
+            class: "Kelas 1A/2025",
+            achievements: 3,
+            totalAchievements: 600,
+            profilePicture: user.profile_picture
+              ? `/${user.profile_picture}`
+              : "",
+          });
+        }
+      } catch (error: unknown) {
         console.error("Error fetching user profile:", error);
         toast.error("Gagal mendapatkan data profil");
       } finally {
@@ -122,7 +124,7 @@ export function ProfileStudent() {
     }
 
     try {
-      const updates: any = {
+      const updates: Record<string, string> = {
         full_name: editedData.fullName,
         email: editedData.email,
         id_pengguna: editedData.userId,
@@ -166,7 +168,7 @@ export function ProfileStudent() {
       setIsEditing(false);
       setNewPassword("");
       setConfirmPassword("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating profile:", error);
       toast.error("Gagal mengemaskini profil");
     }
@@ -211,7 +213,7 @@ export function ProfileStudent() {
         }
 
         toast.success("Gambar profil berjaya dikemaskini!");
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error uploading profile picture:", error);
         toast.error("Gagal mengemaskini gambar profil");
       }

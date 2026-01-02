@@ -69,11 +69,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (token) {
         try {
           // Validate token with backend
-          const response = await axios.get("/api/auth/verify", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
+              const response = await axios.get("/api/auth/verify", {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
           const { user } = response.data;
 
           setUser({

@@ -47,7 +47,7 @@ export default function Announcements() {
 
   const fetchAnnouncements = async () => {
     try {
-      const response = await axios.get("announcements");
+      const response = await axios.get("/api/announcements");
       // Filter to show only announcements created by the current admin user
       const adminAnnouncements = (response.data.data || []).filter(
         (announcement: Announcement) =>
@@ -74,7 +74,7 @@ export default function Announcements() {
 
     setLoading(true);
     try {
-      const response = await axios.post("announcements", {
+      const response = await axios.post("/api/announcements", {
         title: createForm.title,
         content: createForm.content,
         date: createForm.date,

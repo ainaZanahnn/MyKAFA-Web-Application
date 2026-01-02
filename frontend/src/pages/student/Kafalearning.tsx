@@ -144,30 +144,30 @@ export function LearningKafa() {
     if (currentUser) fetchProgress();
   }, [currentUser]);
 
-  const fetchLessons = async () => {
-    if (selectedYear && selectedSubject) {
-      setLoading(true);
-      try {
-        const response = await axios.get('/api/lessons', {
-          params: {
-            subject: selectedSubject.name,
-            year_level: `Year ${selectedYear.year}`
-          }
-        });
-        console.log('API Response:', response.data);
-        console.log('Selected subject:', selectedSubject.name);
-        console.log('Selected year level:', `Year ${selectedYear.year}`);
-        setLessons(response.data.data || []);
-      } catch (error) {
-        console.error('Error fetching lessons:', error);
-        setLessons([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
   useEffect(() => {
+    const fetchLessons = async () => {
+      if (selectedYear && selectedSubject) {
+        setLoading(true);
+        try {
+          const response = await axios.get('/api/lessons', {
+            params: {
+              subject: selectedSubject.name,
+              year_level: `Year ${selectedYear.year}`
+            }
+          });
+          console.log('API Response:', response.data);
+          console.log('Selected subject:', selectedSubject.name);
+          console.log('Selected year level:', `Year ${selectedYear.year}`);
+          setLessons(response.data.data || []);
+        } catch (error) {
+          console.error('Error fetching lessons:', error);
+          setLessons([]);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
     fetchLessons();
   }, [selectedYear, selectedSubject, refreshTrigger, lessonsRefreshTrigger]);
 

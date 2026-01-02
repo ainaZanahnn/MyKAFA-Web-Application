@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import axios from "axios";
+import axios from "@/lib/axios";
 import { Plus, Loader2 } from "lucide-react";
 
 type Paper = {
@@ -74,7 +74,6 @@ export default function ManagePapers() {
 
     try {
       setSubmitting(true);
-      const token = localStorage.getItem("token");
       const formData = new FormData();
       formData.append("year", newPaper.year);
       formData.append("subject", newPaper.subject);
@@ -91,7 +90,6 @@ export default function ManagePapers() {
           formData,
           {
             headers: {
-              Authorization: `Bearer ${token}`,
               "Content-Type": "multipart/form-data",
             },
           }
@@ -102,7 +100,6 @@ export default function ManagePapers() {
           formData,
           {
             headers: {
-              Authorization: `Bearer ${token}`,
               "Content-Type": "multipart/form-data",
             },
           }
@@ -139,12 +136,7 @@ export default function ManagePapers() {
     if (!confirm("Adakah anda pasti mahu memadam kertas soalan ini?")) return;
 
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.delete(`/api/upkk/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await axios.delete(`/api/upkk/${id}`);
 
       if (response.data.success) {
         setPapers(papers.filter((p) => p.id !== id));
@@ -158,12 +150,7 @@ export default function ManagePapers() {
 
   const handleArchive = async (id: number) => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.patch(`/api/upkk/${id}/archive`, {}, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await axios.patch(`/api/upkk/${id}/archive`, {});
 
       if (response.data.success) {
         setPapers(papers.map((p) => p.id === id ? { ...p, status: "Archived" } : p));

@@ -49,7 +49,7 @@ export default function ManageQuizPage() {
   useEffect(() => {
     const fetchQuizzes = async () => {
       try {
-        const response = await axios.get('/admin/quizzes');
+        const response = await axios.get('/api/admin/quizzes');
         // Transform backend data to match QuizData interface
         const transformedQuizzes: QuizData[] = (response.data.quizzes || []).map((quiz: BackendQuiz & { question_count?: number }) => ({
           id: quiz.id,
@@ -74,7 +74,7 @@ export default function ManageQuizPage() {
   const handleSaveQuiz = async (quizData: QuizData) => {
     try {
       // Call backend API to create quiz
-      await axios.post('/admin/quizzes', {
+      await axios.post('/api/admin/quizzes', {
         year: quizData.year,
         subject: quizData.subject,
         topic: quizData.topic,
@@ -83,7 +83,7 @@ export default function ManageQuizPage() {
       });
 
       // Refresh the quizzes list to get updated question counts
-      const refreshResponse = await axios.get('/admin/quizzes');
+      const refreshResponse = await axios.get('/api/admin/quizzes');
       const transformedQuizzes: QuizData[] = (refreshResponse.data.quizzes || []).map((quiz: BackendQuiz & { question_count?: number }) => ({
         id: quiz.id,
         year: quiz.year,
@@ -122,7 +122,7 @@ export default function ManageQuizPage() {
     }
 
     try {
-      await axios.delete(`/admin/quizzes/${id}`);
+      await axios.delete(`/api/admin/quizzes/${id}`);
       // Remove from local state
       setQuizzes(quizzes.filter(quiz => quiz.id !== id));
     } catch (error) {
@@ -134,7 +134,7 @@ export default function ManageQuizPage() {
   const handleEditQuiz = async (quiz: QuizData, index: number) => {
     try {
       // Fetch full quiz data including questions
-      const response = await axios.get(`/admin/quizzes/${quiz.id}`);
+      const response = await axios.get(`/api/admin/quizzes/${quiz.id}`);
       const fullQuiz = response.data.quiz;
 
       // Transform backend data to match QuizData interface
@@ -179,7 +179,7 @@ export default function ManageQuizPage() {
     try {
       if (editingIndex !== null && quizzes[editingIndex].id) {
         // Call backend API to update quiz
-        await axios.put(`/admin/quizzes/${quizzes[editingIndex].id}`, {
+        await axios.put(`/api/admin/quizzes/${quizzes[editingIndex].id}`, {
           year: quizData.year,
           subject: quizData.subject,
           topic: quizData.topic,
@@ -214,7 +214,7 @@ export default function ManageQuizPage() {
 
   const handleStatusChange = async (id: number, status: 'draf' | 'diterbitkan' | 'diarkibkan') => {
     try {
-      await axios.put(`/admin/quizzes/${id}`, { status });
+      await axios.put(`/api/admin/quizzes/${id}`, { status });
 
       // Update local state
       setQuizzes(quizzes.map(quiz =>
