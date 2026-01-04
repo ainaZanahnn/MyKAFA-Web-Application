@@ -4,15 +4,20 @@ export interface AdaptiveQuizSettings {
   difficultyAdjustment: 'conservative' | 'moderate' | 'aggressive';
   enableAIFeedback: boolean;
   scoringRules: {
-    correctPoints: number;
-    incorrectPenalty: number;
-    timeBonus: number;
-    hintPenalty: number;
+    correctPoints: number; // Points for correct answers
+    incorrectPenalty: number; // Penalty for incorrect answers
+    timeBonus: number; // Bonus points for fast answers
+    hintPenalty: number; // Penalty points for using hints
   };
   questionDistribution?: {
     easy: number;
     medium: number;
     hard: number;
+  };
+  hintThresholds: {
+    lowAbility: number; // Hints after X wrong attempts for low ability
+    mediumAbility: number;
+    highAbility: number;
   };
 }
 
@@ -89,59 +94,9 @@ export interface QuizSummary {
   weakTopics?: string[];
 }
 
-// Hint Logic Methods
+// UI Helper Methods (Business logic moved to backend)
 export class AdaptiveQuizEngine {
-  static shouldShowHint(session: QuizSession, settings: AdaptiveQuizSettings): boolean {
-    if (!session.currentQuestion || session.currentQuestion.hints.length === 0) {
-      return false;
-    }
-
-    const baseThreshold = this.getHintThreshold(session.abilityEstimate);
-    const adjustment = settings.difficultyAdjustment === 'conservative' ? 1 :
-                      settings.difficultyAdjustment === 'aggressive' ? -1 : 0;
-    const threshold = Math.max(1, baseThreshold + adjustment);
-
-    return session.consecutiveWrongAnswers >= threshold;
-  }
-
-  static getNextHint(session: QuizSession): string | null {
-    if (!session.currentQuestion || session.currentQuestion.hints.length === 0) {
-      return null;
-    }
-
-    if (session.currentHintsUsed < session.currentQuestion.hints.length) {
-      return session.currentQuestion.hints[session.currentHintsUsed];
-    }
-
-    return null;
-  }
-
-  static consumeHint(session: QuizSession, settings: AdaptiveQuizSettings): { session: QuizSession; penalty: number } {
-    const penalty = settings.scoringRules.hintPenalty;
-    const updatedSession = {
-      ...session,
-      hintsUsed: session.hintsUsed + 1,
-      currentHintsUsed: session.currentHintsUsed + 1,
-      totalScore: Math.max(0, session.totalScore - penalty)
-    };
-
-    return { session: updatedSession, penalty };
-  }
-
-  static getHintThreshold(abilityEstimate: number): number {
-    // Adaptive threshold: lower ability = easier hint access (fewer wrong attempts needed)
-    if (abilityEstimate < 0.3) return 2; // Low ability: hints after 2 wrong attempts
-    if (abilityEstimate < 0.6) return 3; // Medium ability: hints after 3 wrong attempts
-    return 4; // High ability: hints after 4 wrong attempts
-  }
-
-  static updateConsecutiveWrongAnswers(session: QuizSession, isCorrect: boolean): QuizSession {
-    return {
-      ...session,
-      consecutiveWrongAnswers: isCorrect ? 0 : session.consecutiveWrongAnswers + 1
-    };
-  }
-
+  // Simple UI helper for resetting hint state
   static resetCurrentHints(session: QuizSession): QuizSession {
     return {
       ...session,

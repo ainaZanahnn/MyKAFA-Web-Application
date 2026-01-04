@@ -39,7 +39,7 @@ export function QuestionCard({
           </button>
         </div>
         <button
-          onClick={() => onRemoveQuestion(question.id)}
+          onClick={() => onRemoveQuestion(question.id || 0)}
           disabled={false} // Will be handled by parent
           className="p-2 hover:bg-red-100 rounded-lg text-red-600 disabled:opacity-50"
         >
@@ -73,7 +73,7 @@ export function QuestionCard({
             <label className="block text-sm font-bold text-slate-700 mb-2">Teks Soalan / Senario</label>
             <Textarea
               value={question.questionText}
-              onChange={(e) => onUpdateQuestion(question.id, "questionText", e.target.value)}
+              onChange={(e) => onUpdateQuestion(question.id || 0, "questionText", e.target.value)}
               placeholder="Masukkan soalan atau senario"
               className="text-lg"
             />
@@ -87,7 +87,7 @@ export function QuestionCard({
                   <input
                     type="radio"
                     checked={question.answerType === "single"}
-                    onChange={() => onUpdateQuestion(question.id, "answerType", "single")}
+                    onChange={() => onUpdateQuestion(question.id || 0, "answerType", "single")}
                   />
                   Satu Jawapan
                 </label>
@@ -95,7 +95,7 @@ export function QuestionCard({
                   <input
                     type="radio"
                     checked={question.answerType === "multiple"}
-                    onChange={() => onUpdateQuestion(question.id, "answerType", "multiple")}
+                    onChange={() => onUpdateQuestion(question.id || 0, "answerType", "multiple")}
                   />
                   Banyak Jawapan
                 </label>
@@ -109,7 +109,7 @@ export function QuestionCard({
                   <input
                     type="radio"
                     checked={question.difficulty === "easy"}
-                    onChange={() => onUpdateQuestion(question.id, "difficulty", "easy")}
+                    onChange={() => onUpdateQuestion(question.id || 0, "difficulty", "easy")}
                   />
                   Mudah
                 </label>
@@ -117,7 +117,7 @@ export function QuestionCard({
                   <input
                     type="radio"
                     checked={question.difficulty === "medium"}
-                    onChange={() => onUpdateQuestion(question.id, "difficulty", "medium")}
+                    onChange={() => onUpdateQuestion(question.id || 0, "difficulty", "medium")}
                   />
                   Sederhana
                 </label>
@@ -125,7 +125,7 @@ export function QuestionCard({
                   <input
                     type="radio"
                     checked={question.difficulty === "hard"}
-                    onChange={() => onUpdateQuestion(question.id, "difficulty", "hard")}
+                    onChange={() => onUpdateQuestion(question.id || 0, "difficulty", "hard")}
                   />
                   Sukar
                 </label>
@@ -137,7 +137,7 @@ export function QuestionCard({
             <div className="flex items-center gap-4 mb-3">
               <Button onClick={() => {
                 const newHints = [...(question.hints || []), ""];
-                onUpdateQuestion(question.id, "hints", newHints);
+                onUpdateQuestion(question.id || 0, "hints", newHints);
               }}
               variant="outline"
               size="sm"
@@ -154,7 +154,7 @@ export function QuestionCard({
                   onChange={(e) => {
                     const newHints = [...(question.hints || [])];
                     newHints[hintIndex] = e.target.value;
-                    onUpdateQuestion(question.id, "hints", newHints);
+                    onUpdateQuestion(question.id || 0, "hints", newHints);
                   }}
                   placeholder={`Petunjuk ${hintIndex + 1}`}
                   className="flex-1"
@@ -164,7 +164,7 @@ export function QuestionCard({
                   <button
                     onClick={() => {
                       const newHints = (question.hints || []).filter((_: string, i: number) => i !== hintIndex);
-                      onUpdateQuestion(question.id, "hints", newHints);
+                      onUpdateQuestion(question.id || 0, "hints", newHints);
                     }}
                     className="p-2 hover:bg-red-100 rounded text-red-600"
                   >
@@ -182,7 +182,7 @@ export function QuestionCard({
                 <Button
                   onClick={() => {
                     const newOptions = [...question.options, ""]
-                    onUpdateQuestion(question.id, "options", newOptions)
+                    onUpdateQuestion(question.id || 0, "options", newOptions)
                   }}
                   variant="outline"
                   size="sm"
@@ -200,7 +200,7 @@ export function QuestionCard({
                   onChange={(e) => {
                     const newOptions = [...question.options]
                     newOptions[optIndex] = e.target.value
-                    onUpdateQuestion(question.id, "options", newOptions)
+                    onUpdateQuestion(question.id || 0, "options", newOptions)
                   }}
                   placeholder={`Pilihan ${optIndex + 1}`}
                   className="flex-1"
@@ -209,7 +209,7 @@ export function QuestionCard({
                   <button
                     onClick={() => {
                       const newOptions = question.options.filter((_: string, i: number) => i !== optIndex)
-                      onUpdateQuestion(question.id, "options", newOptions)
+                      onUpdateQuestion(question.id || 0, "options", newOptions)
                     }}
                     className="p-2 hover:bg-red-100 rounded text-red-600"
                   >
@@ -238,12 +238,12 @@ export function QuestionCard({
                     onChange={(e) => {
                       const answerLabel = `Answer${optIndex + 1}`
                       if (question.answerType === "single") {
-                        onUpdateQuestion(question.id, "correctAnswers", [answerLabel])
+                        onUpdateQuestion(question.id || 0, "correctAnswers", [answerLabel])
                       } else {
                         const newAnswers = e.target.checked
                           ? [...question.correctAnswers, answerLabel]
                           : question.correctAnswers.filter((a: string) => a !== answerLabel)
-                        onUpdateQuestion(question.id, "correctAnswers", newAnswers)
+                        onUpdateQuestion(question.id || 0, "correctAnswers", newAnswers)
                       }
                     }}
                     className="w-4 h-4"

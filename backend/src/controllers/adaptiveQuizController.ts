@@ -6,7 +6,7 @@ interface Question {
   id: number;
   question: string;
   options: string[];
-  correct_answer: number;
+  correct_answers: number[]; // JSONB array of correct answer indices
   hints: string[];
   topic: string;
   difficulty: 'easy' | 'medium' | 'hard';
@@ -30,6 +30,7 @@ interface QuizSession {
   subject: string;
   topic: string;
   currentQuestionIndex: number;
+  currentQuestion: Question | null;
   abilityEstimate: number;
   questionsAnswered: number;
   totalScore: number;
@@ -46,6 +47,7 @@ interface QuizSession {
   answeredQuestions: number[];
   consecutiveWrongAnswers: number;
   hintsUsed: number;
+  currentHintsUsed: number;
 }
 
 // In-memory session storage (in production, use Redis or database)
@@ -75,7 +77,7 @@ export const startAdaptiveQuiz = async (req: Request, res: Response) => {
 
     // Get questions
     const questionsQuery = `
-      SELECT id, question, options, correct_answer, hints, topic, difficulty
+      SELECT qq.id, question, options, correct_answers, hints, qq.topic, difficulty
       FROM quiz_questions qq
       JOIN quizzes q ON qq.quiz_id = q.id
       WHERE q.year = $1 AND q.subject = $2 AND q.topic = $3
@@ -85,9 +87,16 @@ export const startAdaptiveQuiz = async (req: Request, res: Response) => {
     const questionsResult = await pool.query(questionsQuery, [year, subject, topic]);
     const questions = questionsResult.rows as Question[];
 
+    if (questions.length === 0) {
+      return res.status(404).json({ error: 'No questions available for this quiz' });
+    }
+
     // Calculate initial ability and identify weak topics
     const initialAbility = calculateInitialAbility(historicalProgress, subject, year);
     const weakTopics = identifyWeakTopics(historicalProgress, subject, year);
+
+    // Use all available questions, capped at maxQuestions if specified
+    const totalQuestions = Math.min(questions.length, maxQuestions);
 
     // Create session
     const sessionId = `quiz_${userId}_${Date.now()}`;
@@ -98,12 +107,13 @@ export const startAdaptiveQuiz = async (req: Request, res: Response) => {
       subject,
       topic,
       currentQuestionIndex: 0,
+      currentQuestion: null,
       abilityEstimate: initialAbility,
       questionsAnswered: 0,
       totalScore: 0,
       currentTopicScore: 0,
       weakTopicScore: 0,
-      totalQuestions: maxQuestions,
+      totalQuestions,
       currentTopicQuestions: 0,
       weakTopicQuestions: 0,
       timeSpent: 0,
@@ -113,7 +123,8 @@ export const startAdaptiveQuiz = async (req: Request, res: Response) => {
       availableQuestions: questions,
       answeredQuestions: [],
       consecutiveWrongAnswers: 0,
-      hintsUsed: 0
+      hintsUsed: 0,
+      currentHintsUsed: 0
     };
 
     quizSessions.set(sessionId, session);
@@ -122,7 +133,7 @@ export const startAdaptiveQuiz = async (req: Request, res: Response) => {
       sessionId,
       initialAbility,
       weakTopics,
-      totalQuestions: maxQuestions
+      totalQuestions
     });
 
   } catch (error) {
@@ -155,31 +166,24 @@ export const getNextQuestion = async (req: Request, res: Response) => {
     return res.json({ completed: true });
   }
 
-  // Mark as answered
-  session.answeredQuestions.push(nextQuestion.id);
-  session.questionsAnswered++;
+  // Set current question and reset hint counter
+  session.currentQuestion = nextQuestion;
+  session.currentHintsUsed = 0;
 
   // Determine if this is a weak topic question
   const isWeakTopicQuestion = session.weakTopics.some(weakTopic =>
     weakTopic.includes(nextQuestion.topic)
   );
 
-  if (isWeakTopicQuestion) {
-    session.weakTopicQuestions++;
-  } else {
-    session.currentTopicQuestions++;
-  }
-
   res.json({
-    question: {
-      id: nextQuestion.id,
-      question: nextQuestion.question,
-      options: nextQuestion.options,
-      hints: nextQuestion.hints,
-      isWeakTopicQuestion
-    },
+    id: nextQuestion.id,
+    question: nextQuestion.question,
+    options: nextQuestion.options,
+    correct_answers: nextQuestion.correct_answers,
+    hints: nextQuestion.hints,
+    isWeakTopicQuestion,
     progress: {
-      current: session.questionsAnswered,
+      current: session.questionsAnswered + 1,
       total: session.totalQuestions,
       abilityEstimate: session.abilityEstimate
     }
@@ -193,9 +197,33 @@ export const submitAnswer = async (req: Request, res: Response) => {
   const { sessionId } = req.params;
   const { questionId, answer, timeSpent } = req.body;
 
+  // SECURITY: Validate input parameters - answer can be number or array for multiple choice
+  const isValidAnswer = (ans: any) => {
+    if (typeof ans === 'number') {
+      return ans >= 0 && ans <= 3;
+    }
+    if (Array.isArray(ans)) {
+      return ans.every(a => typeof a === 'number' && a >= 0 && a <= 3);
+    }
+    return false;
+  };
+
+  if (!isValidAnswer(answer)) {
+    return res.status(400).json({ error: 'Invalid answer format' });
+  }
+
+  if (typeof timeSpent !== 'number' || timeSpent < 0 || timeSpent > 300) {
+    return res.status(400).json({ error: 'Invalid time spent' });
+  }
+
   const session = quizSessions.get(sessionId);
   if (!session || session.isCompleted) {
     return res.status(404).json({ error: 'Session not found or completed' });
+  }
+
+  // SECURITY: Check if question was already answered
+  if (session.answeredQuestions.includes(questionId)) {
+    return res.status(400).json({ error: 'Question already answered' });
   }
 
   // Find the question
@@ -204,37 +232,71 @@ export const submitAnswer = async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Question not found' });
   }
 
-  const isCorrect = question.correct_answer === answer;
-  const timeLimitSeconds = 30; // 30 seconds per question
+  // SECURITY: Server-side answer validation (supports multiple correct answers)
+  let isCorrect = false;
+  if (Array.isArray(question.correct_answers)) {
+    // Multiple choice question
+    if (Array.isArray(answer)) {
+      // Check if all selected answers are correct and all correct answers are selected
+      isCorrect = answer.length === question.correct_answers.length &&
+                  answer.every(a => question.correct_answers.includes(a));
+    } else {
+      // Single answer for multiple choice question (partial credit)
+      isCorrect = question.correct_answers.includes(answer);
+    }
+  } else {
+    // Single choice question
+    isCorrect = Number(question.correct_answers) === answer;
+  }
+
+  // SECURITY: Log suspicious activity
+  if (timeSpent < 2) {
+    console.warn(`SECURITY: Suspiciously fast answer (${timeSpent}s) for question ${questionId}, user ${session.userId}`);
+  }
+
+  // Calculate score using adaptive scoring system
+  const scoringRules = {
+    basePoints: 10,
+    timeBonus: 5,
+    hintPenalty: 2, // Configurable hint penalty
+    partialCredit: 0.5 // 50% credit for reasonable wrong answers
+  };
+
+  const timeLimitSeconds = 30;
   const answeredWithinTime = timeSpent <= timeLimitSeconds;
 
-  // Calculate base score with difficulty weighting
   const difficultyMultiplier = {
     'easy': 0.8,   // 8 points for easy
     'medium': 1.0, // 10 points for medium
     'hard': 1.2    // 12 points for hard
   };
 
-  let score = 0;
+  let baseScore = 0;
   let timeBonus = 0;
   let partialCredit = 0;
 
   if (isCorrect) {
-    score = 10 * difficultyMultiplier[question.difficulty];
+    baseScore = scoringRules.basePoints * difficultyMultiplier[question.difficulty];
     if (answeredWithinTime) {
-      timeBonus = 5; // Bonus for answering within time
+      timeBonus = scoringRules.timeBonus; // +5 points for answering within 30 seconds
     }
   } else {
-    // Partial credit for reasonable wrong answers in multiple choice
-    // Assuming 4 options (0-3), and option 1 is most reasonable distractor
+    // Partial credit for reasonable wrong answers (option 1 in multiple choice)
     if (question.options && question.options.length >= 4 && answer === 1) {
-      partialCredit = (10 * difficultyMultiplier[question.difficulty]) * 0.5; // 50% credit
-      score = partialCredit;
+      partialCredit = (scoringRules.basePoints * difficultyMultiplier[question.difficulty]) * scoringRules.partialCredit;
+      baseScore = partialCredit;
     } else {
-      score = 0; // No points for clearly wrong answers
+      baseScore = 0; // No points for clearly wrong answers
     }
     timeBonus = 0;
   }
+
+  const totalPoints = baseScore + timeBonus;
+
+  // Mark question as answered
+  session.answeredQuestions.push(questionId);
+  session.questionsAnswered++;
+  session.totalScore += totalPoints;
 
   // Update session based on question type
   const isWeakTopicQuestion = session.weakTopics.some(weakTopic =>
@@ -242,31 +304,38 @@ export const submitAnswer = async (req: Request, res: Response) => {
   );
 
   if (isWeakTopicQuestion) {
+    session.weakTopicQuestions++;
     if (isCorrect) session.weakTopicScore++;
   } else {
+    session.currentTopicQuestions++;
     if (isCorrect) session.currentTopicScore++;
   }
 
-  // Update ability estimate (simplified IRT model)
+  // Update ability estimate using IRT model
   session.abilityEstimate = updateAbilityEstimate(session.abilityEstimate, question.difficulty, isCorrect);
   session.timeSpent += timeSpent;
 
   // Update consecutive wrong answers for hint logic
   session.consecutiveWrongAnswers = isCorrect ? 0 : session.consecutiveWrongAnswers + 1;
 
-  // Generate performance-based feedback instead of explanation
+  // Generate performance-based feedback
   const feedback = generatePerformanceFeedback(isCorrect, question.difficulty, answeredWithinTime, session.consecutiveWrongAnswers);
 
   res.json({
     isCorrect,
-    score,
+    baseScore,
     timeBonus,
     partialCredit,
-    totalPoints: score + timeBonus,
+    totalPoints,
     answeredWithinTime,
     feedback,
     abilityEstimate: session.abilityEstimate,
-    isWeakTopicQuestion
+    isWeakTopicQuestion,
+    sessionProgress: {
+      current: session.questionsAnswered,
+      total: session.totalQuestions,
+      abilityEstimate: session.abilityEstimate
+    }
   });
 };
 
@@ -294,7 +363,7 @@ export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
 
     // Get questions
     const questionsQuery = `
-      SELECT id, question, options, correct_answer, hints, topic, difficulty
+      SELECT qq.id, question, options, correct_answers, hints, qq.topic, difficulty
       FROM quiz_questions qq
       JOIN quizzes q ON qq.quiz_id = q.id
       WHERE q.year = $1 AND q.subject = $2 AND q.topic = $3
@@ -304,9 +373,16 @@ export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
     const questionsResult = await pool.query(questionsQuery, [year, subject, topic]);
     const questions = questionsResult.rows as Question[];
 
+    if (questions.length === 0) {
+      return res.status(404).json({ error: 'No questions available for this quiz' });
+    }
+
     // Calculate initial ability and identify weak topics
     const initialAbility = calculateInitialAbility(historicalProgress, subject, year);
     const weakTopics = identifyWeakTopics(historicalProgress, subject, year);
+
+    // Use all available questions, capped at maxQuestions if specified
+    const totalQuestions = Math.min(questions.length, maxQuestions);
 
     // Create new session
     const sessionId = `quiz_${userId}_${Date.now()}`;
@@ -317,12 +393,13 @@ export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
       subject,
       topic,
       currentQuestionIndex: 0,
+      currentQuestion: null,
       abilityEstimate: initialAbility,
       questionsAnswered: 0,
       totalScore: 0,
       currentTopicScore: 0,
       weakTopicScore: 0,
-      totalQuestions: maxQuestions,
+      totalQuestions,
       currentTopicQuestions: 0,
       weakTopicQuestions: 0,
       timeSpent: 0,
@@ -332,7 +409,8 @@ export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
       availableQuestions: questions,
       answeredQuestions: [],
       consecutiveWrongAnswers: 0,
-      hintsUsed: 0
+      hintsUsed: 0,
+      currentHintsUsed: 0
     };
 
     quizSessions.set(sessionId, session);
@@ -341,7 +419,7 @@ export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
       sessionId,
       initialAbility,
       weakTopics,
-      totalQuestions: maxQuestions,
+      totalQuestions,
       isRestart: true
     });
 
@@ -349,6 +427,55 @@ export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
     console.error('Error restarting adaptive quiz:', error);
     res.status(500).json({ error: 'Failed to restart quiz' });
   }
+};
+
+/* -------------------------------------------------------------------
+   REQUEST HINT
+------------------------------------------------------------------- */
+export const requestHint = async (req: Request, res: Response) => {
+  const { sessionId } = req.params;
+
+  const session = quizSessions.get(sessionId);
+  if (!session || session.isCompleted) {
+    return res.status(404).json({ error: 'Session not found or completed' });
+  }
+
+  // Check if hints are available for current question
+  if (!session.currentQuestion || session.currentQuestion.hints.length === 0) {
+    return res.status(400).json({ error: 'No hints available for this question' });
+  }
+
+  // Adaptive hint threshold based on ability estimate
+  const hintThreshold = getHintThreshold(session.abilityEstimate);
+  if (session.consecutiveWrongAnswers < hintThreshold) {
+    return res.status(400).json({
+      error: 'Hint not available yet',
+      requiredWrongAttempts: hintThreshold,
+      currentWrongAttempts: session.consecutiveWrongAnswers
+    });
+  }
+
+  // Get next available hint
+  const nextHintIndex = session.currentHintsUsed;
+  if (nextHintIndex >= session.currentQuestion.hints.length) {
+    return res.status(400).json({ error: 'All hints used for this question' });
+  }
+
+  const hint = session.currentQuestion.hints[nextHintIndex];
+
+  // Apply hint penalty
+  const hintPenalty = 2; // Configurable penalty points
+  session.totalScore = Math.max(0, session.totalScore - hintPenalty);
+  session.hintsUsed++;
+  session.currentHintsUsed++;
+
+  res.json({
+    hint,
+    hintIndex: nextHintIndex,
+    penalty: hintPenalty,
+    totalScore: session.totalScore,
+    hintsRemaining: session.currentQuestion.hints.length - session.currentHintsUsed
+  });
 };
 
 /* -------------------------------------------------------------------
@@ -403,6 +530,46 @@ export const getQuizResults = async (req: Request, res: Response) => {
     abilityEstimate: session.abilityEstimate,
     weakTopics: session.weakTopics
   });
+};
+
+/* -------------------------------------------------------------------
+   GET QUIZ PROGRESS FOR STUDENT
+------------------------------------------------------------------- */
+export const getQuizProgress = async (req: Request, res: Response) => {
+  const { userId, year, subject, topic } = req.params;
+
+  try {
+    const query = `
+      SELECT passed, last_score, best_score, total_attempts, last_activity
+      FROM student_quiz_progress
+      WHERE user_id = $1 AND year = $2 AND subject = $3 AND topic = $4
+      ORDER BY last_activity DESC
+      LIMIT 1
+    `;
+
+    const result = await pool.query(query, [userId, year, subject, topic]);
+
+    if (result.rows.length === 0) {
+      return res.json({
+        passed: false,
+        last_score: 0,
+        best_score: 0,
+        total_attempts: 0
+      });
+    }
+
+    const progress = result.rows[0];
+    res.json({
+      passed: progress.passed || false,
+      last_score: progress.last_score || 0,
+      best_score: progress.best_score || 0,
+      total_attempts: progress.total_attempts || 0
+    });
+
+  } catch (error) {
+    console.error('Error fetching quiz progress:', error);
+    res.status(500).json({ error: 'Failed to fetch quiz progress' });
+  }
 };
 
 /* -------------------------------------------------------------------
@@ -491,6 +658,12 @@ function getTargetDifficulty(ability: number): number {
   return 0.7; // Hard
 }
 
+function getHintThreshold(ability: number): number {
+  if (ability < 0.3) return 2; // Low ability: hints available after 2 wrong attempts
+  if (ability < 0.6) return 3; // Medium ability: hints available after 3 wrong attempts
+  return 4; // High ability: hints available after 4 wrong attempts
+}
+
 function getDifficultyScore(difficulty: string): number {
   switch (difficulty) {
     case 'easy': return 0.3;
@@ -509,40 +682,80 @@ function updateAbilityEstimate(currentAbility: number, difficulty: string, isCor
 
 function generatePerformanceFeedback(isCorrect: boolean, difficulty: string, answeredWithinTime: boolean, consecutiveWrongAnswers: number): string {
   if (isCorrect) {
-    let feedback = "Great job! ";
+    let feedback = "Bagus! ";
     if (answeredWithinTime) {
-      feedback += "You answered quickly and correctly. ";
+      feedback += "Anda menjawab dengan cepat dan betul. ";
     } else {
-      feedback += "You got it right. ";
+      feedback += "Anda mendapat jawapan yang betul. ";
     }
 
     if (difficulty === 'hard') {
-      feedback += "This was a challenging question - you're doing well!";
+      feedback += "Soalan ini mencabar - anda lakukan dengan baik!";
     } else if (difficulty === 'medium') {
-      feedback += "Solid understanding shown here.";
+      feedback += "Pemahaman yang kukuh ditunjukkan di sini.";
     } else {
-      feedback += "Keep up the good work!";
+      feedback += "Teruskan usaha yang baik!";
     }
     return feedback;
   } else {
-    let feedback = "Not quite right. ";
+    let feedback = "Tidak betul sepenuhnya. ";
     if (consecutiveWrongAnswers > 1) {
-      feedback += "Consider using a hint if available. ";
+      feedback += "Pertimbangkan menggunakan petunjuk jika tersedia. ";
     }
 
     if (difficulty === 'easy') {
-      feedback += "This was a basic concept - review the fundamentals.";
+      feedback += "Ini adalah konsep asas - semak semula asas.";
     } else if (difficulty === 'medium') {
-      feedback += "This concept needs more practice.";
+      feedback += "Konsep ini memerlukan lebih banyak latihan.";
     } else {
-      feedback += "This was challenging - don't worry, keep trying!";
+      feedback += "Ini mencabar - jangan risau, terus cuba!";
     }
     return feedback;
   }
 }
 
 async function saveQuizResults(session: QuizSession, currentTopicPercentage: number) {
-  // Save to quiz progress
+  // Get quiz ID for the attempt logging
+  const quizQuery = await pool.query(
+    `SELECT id FROM quizzes WHERE year = $1 AND subject = $2 AND topic = $3`,
+    [session.year, session.subject, session.topic]
+  );
+
+  if (quizQuery.rows.length === 0) {
+    throw new Error('Quiz not found for attempt logging');
+  }
+
+  const quizId = quizQuery.rows[0].id;
+
+  // Get next attempt number for this user and quiz
+  const attemptQuery = await pool.query(
+    `SELECT COALESCE(MAX(attempt_number), 0) + 1 as next_attempt
+     FROM quiz_attempt
+     WHERE user_id = $1 AND quiz_id = $2`,
+    [session.userId, quizId]
+  );
+
+  const attemptNumber = attemptQuery.rows[0].next_attempt;
+
+  // Save detailed attempt to quiz_attempt table
+  await pool.query(
+    `INSERT INTO quiz_attempt
+      (user_id, quiz_id, attempt_number, score, time_taken, questions_answered, total_questions, ability_estimate, passed)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      session.userId,
+      quizId,
+      attemptNumber,
+      Math.round(currentTopicPercentage),
+      session.timeSpent,
+      session.questionsAnswered,
+      session.totalQuestions,
+      session.abilityEstimate,
+      currentTopicPercentage >= 75 // 75% mastery threshold
+    ]
+  );
+
+  // Save to quiz progress (aggregated data)
   await pool.query(
     `INSERT INTO student_quiz_progress
       (user_id, year, subject, topic, difficulty_level,
@@ -569,3 +782,5 @@ async function saveQuizResults(session: QuizSession, currentTopicPercentage: num
     ]
   );
 }
+
+

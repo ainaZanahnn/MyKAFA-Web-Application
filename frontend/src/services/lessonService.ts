@@ -131,6 +131,13 @@ class LessonService {
     const response = await apiClient.delete(`/lessons/${id}`);
     return response.data;
   }
+
+  async getTopics(subject: string, year_level: string): Promise<string[]> {
+    const response = await apiClient.get('/lessons/topics', {
+      params: { subject, year_level }
+    });
+    return response.data;
+  }
 }
 
 export default new LessonService();

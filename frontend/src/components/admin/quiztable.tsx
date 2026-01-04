@@ -2,14 +2,14 @@
 
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "../../components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "../../components/ui/dropdown-menu";
 import {
   Edit,
   Trash2,
@@ -17,45 +17,22 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import type { AdaptiveQuizSettings } from '@/lib/AdaptiveQuizEngine';
-
-export interface BlankMapping {
-  blankNumber: number;
-  answerLabel: string;
-}
-
-export interface Item {
-  label: string;
-  text: string;
-  mediaType: string;
-  mediaUrl: string;
-}
-
-export interface Mapping {
-  itemLabel: string;
-  targetLabel: string;
-}
+import type { AdaptiveQuizSettings } from '../../lib/AdaptiveQuizEngine';
 
 export interface Question {
-  id: number;
+  id?: number;
   questionText: string;
   options: string[];
   correctAnswers: string[];
-  answerType: string;
-  sentenceWithBlanks: string;
-  answerPool: string[];
-  blankMapping: BlankMapping[];
-  instruction: string;
-  items: Item[];
-  targets: string[];
-  mapping: Mapping[];
-  difficulty?: 'easy' | 'medium' | 'hard';
+  answerType: 'single' | 'multiple';
+  difficulty: 'easy' | 'medium' | 'hard';
   hints?: string[];
+  targets?: Record<string, unknown>[];
 }
 
 export interface QuizData {
   id?: number;
-  year: number | null;
+  year: number;
   subject: string;
   topic: string;
   quizType: string;

@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from "react";
 import { StudentLessonTable } from "@/components/student/studentlessontable";
-import type { Lesson } from "@/components/student/studentlessontable";
+import type { Lesson } from "@/services/lessonService";
 import { useAuth } from "@/components/auth/useAuth";
 import lessonService from "@/services/lessonService";
 import { progressService } from "@/services/progressService";

@@ -5,17 +5,16 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Play, CheckCircle, Star, Trophy, Lock, Smile } from "lucide-react";
 import { LessonViewer } from "./LessonViewer";
-import { AdaptiveQuizPlayer } from "@/components/quiz/AdaptiveQuizPlayer";
+import { AdaptiveQuizPlayer } from "@/components/quiz/AdaptiveQuizPlayerNew";
 import { defaultAdaptiveSettings } from "@/lib/quiz-constants";
-import type { QuizSummary, Question } from "@/lib/AdaptiveQuizEngine";
 import { progressService } from "@/services/progressService";
-import quizService from "@/services/quizService";
 import { toast } from "react-toastify";
 import { useAuth } from "@/components/auth/useAuth";
 import type { Lesson } from "@/services/lessonService";
+import apiClient from "@/lib/axios";
+
 
 export type Quiz = {
   id: number;
@@ -53,10 +52,9 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [materialProgress, setMaterialProgress] = useState<{ [lessonId: number]: { viewed: number; total: number } }>({});
+  const [quizProgress, setQuizProgress] = useState<{ [topic: string]: { passed: boolean; score: number } }>({});
   const [showQuiz, setShowQuiz] = useState(false);
-  const [quizQuestions, setQuizQuestions] = useState<Question[]>([]);
   const [selectedQuizLesson, setSelectedQuizLesson] = useState<Lesson | null>(null);
-  const [quizSummary, setQuizSummary] = useState<QuizSummary | null>(null);
 
   // Fetch progress on mount and when selectedYear changes
   useEffect(() => {
@@ -110,6 +108,25 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
           }
         }
         setMaterialProgress(materialProgressData);
+
+        // Fetch quiz progress for each lesson
+        const quizProgressData: { [topic: string]: { passed: boolean; score: number } } = {};
+        if (selectedYear && selectedSubject) {
+          for (const lesson of lessons) {
+            try {
+              const quizResponse = await apiClient.get(`/quiz/progress/${currentUser.id}/${selectedYear}/${selectedSubject}/${lesson.title}`);
+              const quizData = quizResponse.data;
+              quizProgressData[lesson.title] = {
+                passed: quizData.passed || false,
+                score: quizData.last_score || 0
+              };
+            } catch (error) {
+              console.error(`Error fetching quiz progress for lesson ${lesson.title}:`, error);
+              quizProgressData[lesson.title] = { passed: false, score: 0 };
+            }
+          }
+        }
+        setQuizProgress(quizProgressData);
       } catch (error) {
         console.error('Error fetching progress:', error);
       }
@@ -122,8 +139,10 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
 
   // Debug logging
   console.log('StudentLessonTable received lessons:', lessons);
+  console.log('First lesson object:', lessons[0]);
   const publishedLessons = (Array.isArray(lessons) ? lessons : []).filter((lesson) => lesson.status === 'diterbitkan');
   console.log('Published lessons:', publishedLessons);
+  console.log('Lesson statuses:', lessons.map(l => ({ title: l.title, status: l.status })));
 
   const handleStartLesson = (lesson: Lesson) => {
     setSelectedLesson(lesson);
@@ -178,40 +197,21 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
     if (!selectedYear || !selectedSubject) return;
 
     try {
-      const { quiz, success } = await quizService.getStudentQuiz(selectedYear, selectedSubject, lesson.title);
-      if (success && quiz && quiz.questions && quiz.questions.length > 0) {
-        // Transform quiz questions to match AdaptiveQuizEngine Question interface
-        const transformedQuestions: Question[] = quiz.questions.map((q, index) => ({
-          id: q.id?.toString() || `question-${index}`,
-          text: q.questionText,
-          options: q.options,
-          correctAnswer: Array.isArray(q.correctAnswers) ? q.correctAnswers[0] : q.correctAnswers,
-          difficulty: q.difficulty,
-          topic: lesson.title,
-          hints: q.hints || [],
-          timeLimit: 60, // Default time limit
-          points: 10 // Default points
-        }));
-        setQuizQuestions(transformedQuestions);
-        setSelectedQuizLesson(lesson);
-        setShowQuiz(true);
-      } else {
-        toast.error('No quiz questions available for this topic.');
-      }
-    } catch (error) {
-      console.error('Error fetching quiz:', error);
-      toast.error('Failed to load quiz.');
+      // For adaptive quiz, we don't need to fetch questions upfront
+      // The AdaptiveQuizPlayerNew will handle everything through AdaptiveQuizService
+      setSelectedQuizLesson(lesson);
+      setShowQuiz(true);
+    } catch (error: unknown) {
+      console.error('Error starting quiz:', error);
+      toast.error('Failed to start quiz.');
     }
   };
 
-  const handleQuizComplete = (summary: QuizSummary) => {
-    setQuizSummary(summary);
+  const handleQuizComplete = (results: unknown) => {
+    console.log('Quiz completed:', results);
+    toast.success('Quiz completed successfully!');
     setShowQuiz(false);
-  };
-
-  const handleRestartQuiz = () => {
-    setQuizSummary(null);
-    setShowQuiz(true);
+    setSelectedQuizLesson(null);
   };
 
   const getMaterialIcons = (materials: Lesson['materials']) => {
@@ -332,7 +332,8 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
                 const materialProgressData = materialProgress[lesson.id];
                 const isLessonCompleted = completedLessons.has(lesson.id) ||
                   (materialProgressData && materialProgressData.total > 0 && materialProgressData.viewed === materialProgressData.total);
-                const isQuizCompleted = false; // TODO: Implement quiz completion tracking per topic
+                const quizData = quizProgress[lesson.title];
+                const isQuizCompleted = quizData?.passed || false;
 
                 return (
                   <div
@@ -417,54 +418,18 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
 
       {/* Quiz Player Modal */}
       {showQuiz && selectedQuizLesson && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-gradient-to-r from-emerald-50 to-amber-50 bg-opacity-80 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <AdaptiveQuizPlayer
               settings={defaultAdaptiveSettings}
-              questions={quizQuestions}
+              year={selectedYear!}
+              subject={selectedSubject!}
+              topic={selectedQuizLesson.title}
               onComplete={handleQuizComplete}
               onExit={() => {
                 setShowQuiz(false);
-                setQuizSummary(null);
               }}
             />
-          </div>
-        </div>
-      )}
-
-      {/* Quiz Summary Modal */}
-      {quizSummary && selectedQuizLesson && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold mb-4">Keputusan Kuiz</h2>
-              <Card className="p-6 mb-4">
-                <div className="text-center">
-                  <div className="text-6xl mb-4">
-                    {quizSummary.totalScore >= 80 ? '🎉' : quizSummary.totalScore >= 60 ? '👍' : '💪'}
-                  </div>
-                  <h3 className="text-3xl font-bold text-blue-600 mb-2">
-                    {quizSummary.totalScore} Mata
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    Anda menjawab {quizSummary.correctAnswers} daripada {quizSummary.totalQuestions} soalan dengan betul
-                  </p>
-                  <div className="flex justify-center gap-4">
-                    <Button onClick={handleRestartQuiz} variant="outline">
-                      Cuba Lagi
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setQuizSummary(null);
-                        setSelectedQuizLesson(null);
-                      }}
-                    >
-                      Selesai
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            </div>
           </div>
         </div>
       )}

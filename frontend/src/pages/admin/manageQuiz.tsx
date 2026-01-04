@@ -3,38 +3,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ManageQuiz } from "@/components/quiz/ManageQuiz";
-import { QuizTable } from "@/components/admin/quiztable";
-import type { QuizData, Question } from "@/components/admin/quiztable";
-import { Button } from "@/components/ui/button";
+import { ManageQuiz } from "../../components/quiz/ManageQuiz";
+import { QuizTable } from "../../components/admin/quiztable";
+import { Button } from "../../components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { defaultAdaptiveSettings } from "@/lib/quiz-constants";
-import axios from "@/lib/axios";
-import { AxiosError } from "axios";
-
-interface BackendQuiz {
-  id: number;
-  year: number;
-  subject: string;
-  topic: string;
-  status: string;
-  created_at: string;
-}
-
-interface BackendQuestion {
-  id: number;
-  questionText: string;
-  options: string[] | string;
-  correctAnswers: string[] | string;
-  difficulty: string;
-  hints: string[] | string | null;
-}
+} from "../../components/ui/select";
+import { defaultAdaptiveSettings } from "../../lib/quiz-constants";
+import quizService, { type BackendQuiz } from "../../services/quizService";
+import type { QuizData, Question } from "../../components/admin/quiztable";
+import { toast } from "react-toastify";
 
 export default function ManageQuizPage() {
   const [quizzes, setQuizzes] = useState<QuizData[]>([]);
@@ -49,16 +31,16 @@ export default function ManageQuizPage() {
   useEffect(() => {
     const fetchQuizzes = async () => {
       try {
-        const response = await axios.get('/api/admin/quizzes');
+        const response = await quizService.getQuizzes();
         // Transform backend data to match QuizData interface
-        const transformedQuizzes: QuizData[] = (response.data.quizzes || []).map((quiz: BackendQuiz & { question_count?: number }) => ({
+        const transformedQuizzes: QuizData[] = (response.quizzes || []).map((quiz: BackendQuiz) => ({
           id: quiz.id,
           year: quiz.year,
           subject: quiz.subject,
           topic: quiz.topic,
           quizType: 'mcq', // Default, can be updated based on actual data
           questions: [], // Will be populated when needed
-          questionCount: quiz.question_count,
+          questionCount: quiz.questionCount || quiz.question_count,
           adaptiveSettings: defaultAdaptiveSettings,
           status: quiz.status as 'draf' | 'diterbitkan' | 'diarkibkan'
         }));
@@ -73,37 +55,35 @@ export default function ManageQuizPage() {
 
   const handleSaveQuiz = async (quizData: QuizData) => {
     try {
+      // Use service transformation method
+      const createData = quizService.transformQuizDataToCreateQuizData(quizData);
+
       // Call backend API to create quiz
-      await axios.post('/api/admin/quizzes', {
+      const response = await quizService.createQuiz(createData);
+
+      // Create the new quiz object with correct question count from backend response
+      const newQuiz: QuizData = {
+        id: response.quizId,
         year: quizData.year,
         subject: quizData.subject,
         topic: quizData.topic,
         quizType: quizData.quizType,
-        questions: quizData.questions
-      });
+        questions: quizData.questions,
+        questionCount: response.questionCount || quizData.questions.length,
+        adaptiveSettings: quizData.adaptiveSettings,
+        status: 'draf'
+      };
 
-      // Refresh the quizzes list to get updated question counts
-      const refreshResponse = await axios.get('/api/admin/quizzes');
-      const transformedQuizzes: QuizData[] = (refreshResponse.data.quizzes || []).map((quiz: BackendQuiz & { question_count?: number }) => ({
-        id: quiz.id,
-        year: quiz.year,
-        subject: quiz.subject,
-        topic: quiz.topic,
-        quizType: 'mcq', // Default, can be updated based on actual data
-        questions: [], // Will be populated when needed
-        questionCount: quiz.question_count,
-        adaptiveSettings: defaultAdaptiveSettings,
-        status: quiz.status as 'draf' | 'diterbitkan' | 'diarkibkan'
-      }));
-      setQuizzes(transformedQuizzes);
+      // Add the new quiz to the local state immediately
+      setQuizzes(prev => [newQuiz, ...prev]);
 
       setShowCreateForm(false);
     } catch (error: unknown) {
       console.error('Error creating quiz:', error);
 
       // Handle 409 error (quiz already exists)
-      if (error instanceof AxiosError && error.response?.status === 409) {
-        alert('Kuiz untuk topik ini sudah wujud. Sila cari kuiz tersebut dalam jadual dan edit untuk menambah soalan baharu.');
+      if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' && error.message.includes('409')) {
+        toast.error('Kuiz untuk topik ini sudah wujud. Sila cari kuiz tersebut dalam jadual dan edit untuk menambah soalan baharu.');
         return;
       }
 
@@ -122,7 +102,7 @@ export default function ManageQuizPage() {
     }
 
     try {
-      await axios.delete(`/api/admin/quizzes/${id}`);
+      await quizService.deleteQuiz(id);
       // Remove from local state
       setQuizzes(quizzes.filter(quiz => quiz.id !== id));
     } catch (error) {
@@ -134,33 +114,33 @@ export default function ManageQuizPage() {
   const handleEditQuiz = async (quiz: QuizData, index: number) => {
     try {
       // Fetch full quiz data including questions
-      const response = await axios.get(`/api/admin/quizzes/${quiz.id}`);
-      const fullQuiz = response.data.quiz;
+      const response = await quizService.getQuiz(quiz.id as number);
+      const fullQuiz = response.quiz;
 
       // Transform backend data to match QuizData interface
-      const transformedQuestions: Question[] = (fullQuiz.questions || []).map((q: BackendQuestion) => ({
-        id: q.id,
+      const transformedQuestions: Question[] = (fullQuiz.questions || []).map((q: {
+        id?: number;
+        questionText?: string;
+        options?: unknown;
+        correctAnswers?: unknown;
+        difficulty?: string;
+        hints?: unknown;
+      }) => ({
+        id: q.id || 0,
         questionText: q.questionText || '',
-        options: q.options && q.options.length > 0 ? q.options : ['', '', '', ''],
-        correctAnswers: q.correctAnswers || [],
-        answerType: (q.correctAnswers || []).length > 1 ? 'multiple' : 'single',
-        sentenceWithBlanks: '',
-        answerPool: [],
-        blankMapping: [],
-        instruction: '',
-        items: [],
-        targets: [],
-        mapping: [],
+        options: Array.isArray(q.options) && q.options.length > 0 ? q.options : ['', '', '', ''],
+        correctAnswers: Array.isArray(q.correctAnswers) ? q.correctAnswers : [],
+        answerType: (Array.isArray(q.correctAnswers) && q.correctAnswers.length > 1) ? 'multiple' : 'single',
         difficulty: q.difficulty || 'medium',
-        hints: q.hints || []
+        hints: Array.isArray(q.hints) ? q.hints : []
       }));
 
       const transformedQuiz: QuizData = {
         id: fullQuiz.id,
-        year: fullQuiz.year,
+        year: fullQuiz.year || 0,
         subject: fullQuiz.subject,
         topic: fullQuiz.topic,
-        quizType: fullQuiz.quiz_type || 'mcq',
+        quizType: fullQuiz.quizType || 'mcq',
         questions: transformedQuestions,
         questionCount: transformedQuestions.length,
         adaptiveSettings: defaultAdaptiveSettings
@@ -178,14 +158,25 @@ export default function ManageQuizPage() {
   const handleUpdateQuiz = async (quizData: QuizData) => {
     try {
       if (editingIndex !== null && quizzes[editingIndex].id) {
+        // Transform questions to match service expected type
+        const transformedQuestions: Question[] = quizData.questions.map(q => ({
+          id: q.id,
+          questionText: q.questionText,
+          options: q.options,
+          correctAnswers: q.correctAnswers,
+          answerType: q.answerType,
+          difficulty: q.difficulty || 'medium',
+          hints: q.hints || []
+        }));
+
         // Call backend API to update quiz
-        await axios.put(`/api/admin/quizzes/${quizzes[editingIndex].id}`, {
+        await quizService.updateQuiz(quizzes[editingIndex].id, {
           year: quizData.year,
           subject: quizData.subject,
           topic: quizData.topic,
           quizType: quizData.quizType,
-          status: 'draft', // Default status
-          questions: quizData.questions
+          status: 'draf', // Default status
+          questions: transformedQuestions
         });
 
         // Update local state
@@ -214,7 +205,7 @@ export default function ManageQuizPage() {
 
   const handleStatusChange = async (id: number, status: 'draf' | 'diterbitkan' | 'diarkibkan') => {
     try {
-      await axios.put(`/api/admin/quizzes/${id}`, { status });
+      await quizService.updateQuizStatus(id, status);
 
       // Update local state
       setQuizzes(quizzes.map(quiz =>

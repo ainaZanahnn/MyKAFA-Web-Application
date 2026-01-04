@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from '../../components/ui/button';
 import { Plus, Settings } from 'lucide-react';
 import { QuizHeader } from './QuizHeader';
 import { QuestionCard } from './QuestionCard';
 import { AdaptiveSettings } from './AdaptiveSettings';
-import type { AdaptiveQuizSettings } from '@/lib/AdaptiveQuizEngine';
-import { defaultAdaptiveSettings } from '@/lib/quiz-constants';
-import type { QuizData, Question } from '@/components/admin/quiztable';
-import axios from '@/lib/axios';
+import type { AdaptiveQuizSettings } from '../../lib/AdaptiveQuizEngine';
+import { defaultAdaptiveSettings } from '../../lib/quiz-constants';
+import type { QuizData, Question } from '../../components/admin/quiztable';
+import quizService from '@/services/quizService';
+import lessonService from '../../services/lessonService';
+import { toast } from 'react-toastify';
 
 interface ManageQuizProps {
   onSave: (quizData: QuizData) => Promise<void>;
@@ -16,7 +18,7 @@ interface ManageQuizProps {
   isEditing?: boolean;
 }
 
-export function ManageQuiz({ onSave, onCancel, initialQuiz, isEditing }: ManageQuizProps) {
+export const ManageQuiz: React.FC<ManageQuizProps> = ({ onSave, onCancel, initialQuiz, isEditing }) => {
   const [year, setYear] = useState<number | null>(null);
   const [subject, setSubject] = useState('');
   const [topic, setTopic] = useState('');
@@ -42,9 +44,9 @@ export function ManageQuiz({ onSave, onCancel, initialQuiz, isEditing }: ManageQ
     const fetchTopics = async () => {
       if (year && subject) {
         try {
-          const englishYear = `Year ${year}`;
-          const response = await axios.get(`lessons/topics?subject=${subject}&year_level=${englishYear}`);
-          setAvailableTopics(response.data);
+          const yearLevel = `Year ${year}`;
+          const topics = await lessonService.getTopics(subject, yearLevel);
+          setAvailableTopics(topics);
         } catch (error) {
           console.error('Error fetching topics:', error);
           setAvailableTopics([]);
@@ -64,8 +66,8 @@ export function ManageQuiz({ onSave, onCancel, initialQuiz, isEditing }: ManageQ
     const fetchExistingQuizTopics = async () => {
       if (year && subject && !isEditing) {
         try {
-          const response = await axios.get('/admin/quizzes');
-          const existingTopics = response.data.quizzes
+          const response = await quizService.getQuizzes();
+          const existingTopics = response.quizzes
             .filter((quiz: { year: number; subject: string; topic: string }) =>
               quiz.year === year && quiz.subject === subject
             )
@@ -93,13 +95,6 @@ export function ManageQuiz({ onSave, onCancel, initialQuiz, isEditing }: ManageQ
       options: ['', '', '', ''],
       correctAnswers: [],
       answerType: 'single',
-      sentenceWithBlanks: '',
-      answerPool: [],
-      blankMapping: [],
-      instruction: '',
-      items: [],
-      targets: [],
-      mapping: [],
       difficulty: 'medium'
     };
     setQuestions([...questions, newQuestion]);
@@ -118,7 +113,7 @@ export function ManageQuiz({ onSave, onCancel, initialQuiz, isEditing }: ManageQ
     setIsSaving(true);
     try {
       const quizData: QuizData = {
-        year,
+        year: year || 0,
         subject,
         topic,
         quizType: 'mcq', // Default quiz type
@@ -126,6 +121,13 @@ export function ManageQuiz({ onSave, onCancel, initialQuiz, isEditing }: ManageQ
         adaptiveSettings
       };
       await onSave(quizData);
+      toast.success(isEditing ? 'Kuiz berjaya dikemaskini!' : 'Kuiz berjaya disimpan!');
+    } catch (error: unknown) {
+      console.error('Error saving quiz:', error);
+      const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+        ? error.message
+        : 'Gagal menyimpan kuiz. Sila cuba lagi.';
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -204,7 +206,7 @@ export function ManageQuiz({ onSave, onCancel, initialQuiz, isEditing }: ManageQ
 
               {questions.map((question, index) => (
                 <QuestionCard
-                  key={question.id}
+                  key={question.id || index}
                   question={question}
                   index={index}
                   quizType={'mcq'}

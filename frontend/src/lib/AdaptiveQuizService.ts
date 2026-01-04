@@ -12,7 +12,8 @@ export interface QuestionResponse {
   question: string;
   options: string[];
   hints: string[];
-  correct_answer: number;
+  correct_answers: number | number[];
+  difficulty: string;
   isWeakTopicQuestion: boolean;
   progress: {
     current: number;
@@ -23,7 +24,7 @@ export interface QuestionResponse {
 
 export interface AnswerResponse {
   isCorrect: boolean;
-  score: number;
+  baseScore: number;
   timeBonus: number;
   partialCredit: number;
   totalPoints: number;
@@ -31,6 +32,11 @@ export interface AnswerResponse {
   feedback: string;
   abilityEstimate: number;
   isWeakTopicQuestion: boolean;
+  sessionProgress: {
+    current: number;
+    total: number;
+    abilityEstimate: number;
+  };
 }
 
 export interface QuizResults {
@@ -52,7 +58,7 @@ export interface QuizResults {
 }
 
 class AdaptiveQuizService {
-  private baseURL = '/api/adaptive-quiz';
+  private baseURL = '/adaptive-quiz';
 
   async startQuiz(userId: string, year: number, subject: string, topic: string, maxQuestions: number = 10): Promise<QuizSession> {
     const response = await axios.post(`${this.baseURL}/start`, {
@@ -70,7 +76,7 @@ class AdaptiveQuizService {
     return response.data;
   }
 
-  async submitAnswer(sessionId: string, questionId: number, answer: number, timeSpent: number): Promise<AnswerResponse> {
+  async submitAnswer(sessionId: string, questionId: number, answer: number | number[], timeSpent: number): Promise<AnswerResponse> {
     const response = await axios.post(`${this.baseURL}/answer/${sessionId}`, {
       questionId,
       answer,
@@ -81,6 +87,17 @@ class AdaptiveQuizService {
 
   async getResults(sessionId: string): Promise<QuizResults> {
     const response = await axios.get(`${this.baseURL}/results/${sessionId}`);
+    return response.data;
+  }
+
+  async requestHint(sessionId: string): Promise<{
+    hint: string;
+    hintIndex: number;
+    penalty: number;
+    totalScore: number;
+    hintsRemaining: number;
+  }> {
+    const response = await axios.post(`${this.baseURL}/hint/${sessionId}`);
     return response.data;
   }
 }

@@ -48,10 +48,9 @@ export default function Announcements() {
   const fetchAnnouncements = async () => {
     try {
       const response = await announcementService.getAnnouncements();
-      // Filter to show only announcements created by the current admin user
+      // For admin users, show all announcements of type "announcement"
       const adminAnnouncements = (response.data || []).filter(
         (announcement: Announcement) =>
-          announcement.author_id === user?.id &&
           announcement.type === "announcement"
       );
       setAnnouncements(adminAnnouncements);

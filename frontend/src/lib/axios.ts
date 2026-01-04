@@ -20,10 +20,10 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor for error handling
+// Response interceptor for error handling with retry logic
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     // Log errors for debugging
     console.error('API Error:', error);
 
@@ -32,6 +32,16 @@ apiClient.interceptors.response.use(
       // Server responded with error status
       const { status, data } = error.response;
       console.error(`HTTP ${status} Error:`, data);
+
+      // Retry logic for rate limiting (429) errors
+      if (status === 429 && !error.config._retry) {
+        error.config._retry = true;
+        const retryDelay = Math.random() * 2000 + 1000; // Random delay between 1-3 seconds
+        console.log(`Rate limited. Retrying in ${retryDelay}ms...`);
+
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return apiClient(error.config);
+      }
     } else if (error.request) {
       // Request was made but no response received
       console.error('Network Error:', error.request);

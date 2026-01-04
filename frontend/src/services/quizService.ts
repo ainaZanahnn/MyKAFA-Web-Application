@@ -1,87 +1,98 @@
-import apiClient from '@/lib/axios';
+import axios from '@/lib/axios';
+import type { QuizStats } from '@/types/kafaTypes';
+import type { AdaptiveQuizSettings } from '../lib/AdaptiveQuizEngine';
+
+export interface BackendQuiz {
+  id: number;
+  year: number;
+  subject: string;
+  topic: string;
+  quiz_type?: string;
+  status: string;
+  questionCount?: number;
+  question_count?: number;
+}
 
 export interface Question {
   id?: number;
   questionText: string;
   options: string[];
-  correctAnswers: string[];
+  correctAnswers: number[] | string[];
   answerType: 'single' | 'multiple';
-  sentenceWithBlanks?: string;
-  answerPool?: string[];
-  blankMapping?: Record<string, unknown>[];
-  instruction?: string;
-  items?: Record<string, unknown>[];
-  targets?: Record<string, unknown>[];
-  mapping?: Record<string, unknown>[];
   difficulty: 'easy' | 'medium' | 'hard';
   hints?: string[];
+  targets?: Record<string, unknown>[];
 }
 
-export interface Quiz {
-  id: number;
+export interface QuizData {
+  id?: number;
   year: number;
   subject: string;
   topic: string;
   quizType: string;
   questions: Question[];
   questionCount?: number;
-  status: 'draf' | 'diterbitkan' | 'diarkibkan';
-  created_at?: string;
-}
-
-export interface CreateQuizData {
-  year: number;
-  subject: string;
-  topic: string;
-  quizType: string;
-  questions: Question[];
-  status?: string;
-}
-
-export interface UpdateQuizData {
-  year?: number;
-  subject?: string;
-  topic?: string;
-  quizType?: string;
-  status?: string;
-  questions?: Question[];
+  adaptiveSettings: AdaptiveQuizSettings;
+  status?: 'draf' | 'diterbitkan' | 'diarkibkan';
 }
 
 class QuizService {
-  async getQuizzes(): Promise<{ quizzes: Quiz[]; success: boolean }> {
-    const response = await apiClient.get('/admin/quizzes');
+  async getQuizStats(year: number, subject: string, topic: string): Promise<QuizStats> {
+    const response = await axios.get(`/quizzes/student/stats/${year}/${subject}/${topic}`);
+    return response.data.stats;
+  }
+
+  async getStudentQuiz(year: number, subject: string, topic: string) {
+    const response = await axios.get(`/quizzes/student/${year}/${subject}/${topic}`);
     return response.data;
   }
 
-  async getQuiz(id: number): Promise<{ quiz: Quiz; success: boolean }> {
-    const response = await apiClient.get(`/admin/quizzes/${id}`);
+  async getQuizzes() {
+    const response = await axios.get('/admin');
     return response.data;
   }
 
-  async createQuiz(data: CreateQuizData): Promise<{ success: boolean; message?: string }> {
-    const response = await apiClient.post('/admin/quizzes', data);
+  async getQuiz(id: number) {
+    const response = await axios.get(`/admin/${id}`);
     return response.data;
   }
 
-  async updateQuiz(id: number, data: UpdateQuizData): Promise<{ success: boolean; message?: string }> {
-    const response = await apiClient.put(`/admin/quizzes/${id}`, data);
+  async createQuiz(quizData: unknown) {
+    const response = await axios.post('/admin', quizData);
     return response.data;
   }
 
-  async deleteQuiz(id: number): Promise<{ success: boolean; message?: string }> {
-    const response = await apiClient.delete(`/admin/quizzes/${id}`);
+  async updateQuiz(id: number, quizData: unknown) {
+    const response = await axios.put(`/admin/${id}`, quizData);
     return response.data;
   }
 
-  async updateQuizStatus(id: number, status: 'draf' | 'diterbitkan' | 'diarkibkan'): Promise<{ success: boolean; message?: string }> {
-    const response = await apiClient.put(`/admin/quizzes/${id}`, { status });
+  async deleteQuiz(id: number) {
+    const response = await axios.delete(`/admin/${id}`);
     return response.data;
   }
 
-  async getStudentQuiz(year: number, subject: string, topic: string): Promise<{ quiz: Quiz; success: boolean }> {
-    const response = await apiClient.get(`/api/quizzes/student/${year}/${subject}/${topic}`);
+  async updateQuizStatus(id: number, status: string) {
+    const response = await axios.put(`/admin/${id}/status`, { status });
     return response.data;
+  }
+
+  transformQuizDataToCreateQuizData(quizData: QuizData) {
+    return {
+      year: quizData.year,
+      subject: quizData.subject,
+      topic: quizData.topic,
+      quizType: quizData.quizType,
+      questions: quizData.questions.map(q => ({
+        questionText: q.questionText,
+        options: q.options,
+        correctAnswers: q.correctAnswers,
+        hints: q.hints,
+        difficulty: q.difficulty
+      }))
+    };
   }
 }
 
-export default new QuizService();
+const quizService = new QuizService();
+export default quizService;
