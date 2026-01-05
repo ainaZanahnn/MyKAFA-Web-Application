@@ -4,8 +4,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, Plus, ChevronDown, ChevronUp } from 'lucide-react';
-import type { Question } from '@/components/admin/quiztable';
+import { Trash2, Plus, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
+import type { Question, QuestionOption } from '@/components/admin/quiztable';
 
 interface QuestionCardProps {
   question: Question;
@@ -25,6 +25,62 @@ export function QuestionCard({
   const [isExpanded, setIsExpanded] = useState(false);
 
   const toggleExpanded = () => setIsExpanded(!isExpanded);
+
+  // Generate unique ID for new options
+  const generateOptionId = () => `opt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  // Update option text
+  const updateOptionText = (optionId: string, newText: string) => {
+    const newOptions = question.options.map(opt =>
+      opt.id === optionId ? { ...opt, text: newText } : opt
+    );
+    onUpdateQuestion(question.id || 0, "options", newOptions);
+
+    // If the text is being filled (not emptied) and it's not already the correct answer,
+    // automatically set it as the correct answer
+    if (newText.trim() !== '' && !question.correctAnswers.includes(optionId)) {
+      if (question.answerType === "single") {
+        onUpdateQuestion(question.id || 0, "correctAnswers", [optionId]);
+      } else {
+        // For multiple answers, add it to correct answers
+        const newCorrectAnswers = [...question.correctAnswers, optionId];
+        onUpdateQuestion(question.id || 0, "correctAnswers", newCorrectAnswers);
+      }
+    }
+  };
+
+  // Add new option
+  const addOption = () => {
+    const newOption: QuestionOption = {
+      id: generateOptionId(),
+      text: ""
+    };
+    const newOptions = [...question.options, newOption];
+    onUpdateQuestion(question.id || 0, "options", newOptions);
+  };
+
+  // Remove option
+  const removeOption = (optionId: string) => {
+    const newOptions = question.options.filter(opt => opt.id !== optionId);
+    // Also remove from correct answers if it was selected
+    const newCorrectAnswers = question.correctAnswers.filter(id => id !== optionId);
+    onUpdateQuestion(question.id || 0, "options", newOptions);
+    if (newCorrectAnswers.length !== question.correctAnswers.length) {
+      onUpdateQuestion(question.id || 0, "correctAnswers", newCorrectAnswers);
+    }
+  };
+
+  // Toggle correct answer
+  const toggleCorrectAnswer = (optionId: string) => {
+    if (question.answerType === "single") {
+      onUpdateQuestion(question.id || 0, "correctAnswers", [optionId]);
+    } else {
+      const newAnswers = question.correctAnswers.includes(optionId)
+        ? question.correctAnswers.filter(id => id !== optionId)
+        : [...question.correctAnswers, optionId];
+      onUpdateQuestion(question.id || 0, "correctAnswers", newAnswers);
+    }
+  };
 
   return (
     <Card className={`${isExpanded ? 'p-6' : 'p-4'} bg-slate-50 border-slate-200`}>
@@ -147,7 +203,7 @@ export function QuestionCard({
             <p className="text-xs text-slate-500">Petunjuk membantu pelajar yang menghadapi kesukaran. Petunjuk pertama akan ditunjukkan dahulu, diikuti dengan petunjuk yang lebih terperinci jika diperlukan.</p>
             </div>
             {(question.hints || []).map((hint: string, hintIndex: number) => (
-              <div key={hintIndex} className="flex gap-2 mb-2 items-center">
+              <div key={`hint-${index}-${hintIndex}`} className="flex gap-2 mb-2 items-center">
                 <span className="text-sm font-semibold text-slate-600 w-20">Petunjuk {hintIndex + 1}:</span>
                 <Textarea
                   value={hint}
@@ -180,10 +236,7 @@ export function QuestionCard({
               <label className="text-sm font-bold text-slate-700">Pilihan Jawapan</label>
               {question.options.length < 5 && (
                 <Button
-                  onClick={() => {
-                    const newOptions = [...question.options, ""]
-                    onUpdateQuestion(question.id || 0, "options", newOptions)
-                  }}
+                  onClick={addOption}
                   variant="outline"
                   size="sm"
                 >
@@ -192,25 +245,20 @@ export function QuestionCard({
                 </Button>
               )}
             </div>
-            {question.options?.map((option: string, optIndex: number) => (
-              <div key={optIndex} className="flex gap-2 mb-2 items-center">
+            {question.options?.map((option: QuestionOption, optIndex: number) => (
+              <div key={`option-${index}-${optIndex}`} className="flex gap-2 mb-2 items-center">
+                <GripVertical className="w-4 h-4 text-slate-400 cursor-move" />
                 <span className="text-sm font-semibold text-slate-600 w-20">Pilihan {optIndex + 1}:</span>
                 <Input
-                  value={option}
-                  onChange={(e) => {
-                    const newOptions = [...question.options]
-                    newOptions[optIndex] = e.target.value
-                    onUpdateQuestion(question.id || 0, "options", newOptions)
-                  }}
+                  value={option.text}
+                  onChange={(e) => updateOptionText(option.id, e.target.value)}
                   placeholder={`Pilihan ${optIndex + 1}`}
                   className="flex-1"
+                  autoComplete="off"
                 />
                 {question.options.length > 3 && (
                   <button
-                    onClick={() => {
-                      const newOptions = question.options.filter((_: string, i: number) => i !== optIndex)
-                      onUpdateQuestion(question.id || 0, "options", newOptions)
-                    }}
+                    onClick={() => removeOption(option.id)}
                     className="p-2 hover:bg-red-100 rounded text-red-600"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -225,31 +273,17 @@ export function QuestionCard({
               Jawapan Betul
             </label>
             <div className="space-y-2">
-              {question.options?.map((option: string, optIndex: number) => (
-                <label key={optIndex} className="flex items-center gap-3 p-3 bg-white rounded-lg border">
+              {question.options?.map((option: QuestionOption, optIndex: number) => (
+                <label key={`correct-${index}-${optIndex}`} className="flex items-center gap-3 p-3 bg-white rounded-lg border">
                   <input
                     type={question.answerType === "single" ? "radio" : "checkbox"}
-                    name={`question-${question.id}`}
-                    checked={
-                      question.answerType === "single"
-                        ? question.correctAnswers.includes(`Answer${optIndex + 1}`)
-                        : question.correctAnswers.includes(`Answer${optIndex + 1}`)
-                    }
-                    onChange={(e) => {
-                      const answerLabel = `Answer${optIndex + 1}`
-                      if (question.answerType === "single") {
-                        onUpdateQuestion(question.id || 0, "correctAnswers", [answerLabel])
-                      } else {
-                        const newAnswers = e.target.checked
-                          ? [...question.correctAnswers, answerLabel]
-                          : question.correctAnswers.filter((a: string) => a !== answerLabel)
-                        onUpdateQuestion(question.id || 0, "correctAnswers", newAnswers)
-                      }
-                    }}
+                    name={`question-${question.id || index}`}
+                    checked={question.correctAnswers.includes(option.id)}
+                    onChange={() => toggleCorrectAnswer(option.id)}
                     className="w-4 h-4"
                   />
                   <span className="font-semibold text-green-600">Jawapan{optIndex + 1}</span>
-                  <span className="text-slate-600">{option || "(Kosong)"}</span>
+                  <span className="text-slate-600">{option.text || "(Kosong)"}</span>
                 </label>
               ))}
             </div>

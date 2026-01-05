@@ -19,11 +19,16 @@ import {
 } from "lucide-react";
 import type { AdaptiveQuizSettings } from '../../lib/AdaptiveQuizEngine';
 
+export interface QuestionOption {
+  id: string;
+  text: string;
+}
+
 export interface Question {
   id?: number;
   questionText: string;
-  options: string[];
-  correctAnswers: string[];
+  options: QuestionOption[];
+  correctAnswers: string[]; // Array of option IDs
   answerType: 'single' | 'multiple';
   difficulty: 'easy' | 'medium' | 'hard';
   hints?: string[];
@@ -36,10 +41,14 @@ export interface QuizData {
   subject: string;
   topic: string;
   quizType: string;
+  quiz_type?: string;
   questions: Question[];
   questionCount?: number;
+  question_count?: number;
   adaptiveSettings: AdaptiveQuizSettings;
   status?: 'draf' | 'diterbitkan' | 'diarkibkan';
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface QuizTableProps {
@@ -113,28 +122,30 @@ export function QuizTable({
                       <Edit className="w-4 h-4 mr-2" /> Sunting Kuiz
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    {quiz.status !== 'draf' && (
+                    {quiz.status !== 'draf' && quiz.id && (
                       <DropdownMenuItem onClick={() => onStatusChange?.(quiz.id!, 'draf')}>
                         📝 Tetapkan sebagai Draf
                       </DropdownMenuItem>
                     )}
-                    {quiz.status !== 'diterbitkan' && (
+                    {quiz.status !== 'diterbitkan' && quiz.id && (
                       <DropdownMenuItem onClick={() => onStatusChange?.(quiz.id!, 'diterbitkan')}>
                         🟢 Terbitkan Kuiz
                       </DropdownMenuItem>
                     )}
-                    {quiz.status !== 'diarkibkan' && (
+                    {quiz.status !== 'diarkibkan' && quiz.id && (
                       <DropdownMenuItem onClick={() => onStatusChange?.(quiz.id!, 'diarkibkan')}>
                         📦 Arkibkan Kuiz
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-red-600"
-                      onClick={() => onDeleteQuiz?.(quiz.id!)}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" /> Padam Kuiz
-                    </DropdownMenuItem>
+                    {quiz.id && (
+                      <DropdownMenuItem
+                        className="text-red-600"
+                        onClick={() => onDeleteQuiz?.(quiz.id!)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" /> Padam Kuiz
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </td>

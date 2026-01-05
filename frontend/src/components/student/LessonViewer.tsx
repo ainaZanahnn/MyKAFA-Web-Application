@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { CheckCircle, FileText, Video, AudioLines, Link, Presentation } from "lucide-react";
-import axios from "@/lib/axios";
+import { progressService } from "@/services/progressService";
+import lessonService from "@/services/lessonService";
 
 export type Lesson = {
   id: number;
@@ -42,8 +43,7 @@ export function LessonViewer({ lesson, isOpen, onClose, onComplete, selectedYear
       const loadViewedMaterials = async () => {
         try {
           console.log(`Fetching viewed materials for lesson: ${lesson.title}, year: ${selectedYear}, subject: ${lesson.subject}`);
-          const response = await axios.get(`/api/progress/material-progress?year=${selectedYear}&subject=${lesson.subject}&topic=${lesson.title}`);
-          const materialsViewed = response.data.materialsViewed || [];
+          const { materialsViewed } = await progressService.getMaterialProgress(selectedYear, lesson.subject, lesson.title);
           console.log(`API Response - materialsViewed:`, materialsViewed);
           console.log(`Current lesson materials:`, lesson.materials?.map(m => ({ id: m.id, title: m.title })));
 
@@ -69,12 +69,7 @@ export function LessonViewer({ lesson, isOpen, onClose, onComplete, selectedYear
   const handleViewMaterial = async (materialId: number) => {
     if (!selectedYear) return;
     try {
-      await axios.post('/progress/mark-material-viewed', {
-        year: selectedYear,
-        subject: lesson.subject,
-        topic: lesson.title,
-        materialId
-      });
+      await progressService.markMaterialViewed(selectedYear, lesson.subject, lesson.title, materialId);
       setViewedMaterials(prev => new Set(prev).add(materialId));
       console.log(`Material ${materialId} marked as viewed for lesson ${lesson.title}`);
     } catch (error) {
@@ -105,10 +100,7 @@ export function LessonViewer({ lesson, isOpen, onClose, onComplete, selectedYear
       try {
         // For uploaded files, use the backend route
         if (material.type !== "Link") {
-          const response = await axios.get(`/api/lessons/${lesson.id}/materials/${material.id}/view`, {
-            responseType: 'blob'
-          });
-          const blob = new Blob([response.data], { type: response.headers['content-type'] });
+          const blob = await lessonService.viewLessonMaterial(lesson.id, material.id);
           const url = window.URL.createObjectURL(blob);
           window.open(url, '_blank');
         } else {

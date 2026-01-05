@@ -201,6 +201,7 @@ export function AdaptiveQuizPlayer({
           onUseHint={quizSession.handleUseHint}
           onSubmit={handleAnswerSubmit}
           canShowHint={quizSession.canShowHint()}
+          weakTopics={quizSession.weakTopics}
         />
       );
 

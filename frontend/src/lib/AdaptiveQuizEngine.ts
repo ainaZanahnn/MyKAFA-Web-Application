@@ -53,6 +53,7 @@ export interface QuizSession {
     hintsUsed: number;
   }[];
   isCompleted: boolean;
+  weakTopics?: string[];
 }
 
 export interface QuizSummary {

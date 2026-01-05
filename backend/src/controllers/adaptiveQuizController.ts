@@ -1,15 +1,23 @@
 import { Request, Response } from 'express';
 import pool from '../config/db';
 import { getMergedUserProgress } from '../models/mergedProgressModel';
+import { recordQuizAttempt } from '../models/quizProgressModel';
+
+interface QuestionOption {
+  id: string;
+  text: string;
+}
 
 interface Question {
   id: number;
   question: string;
-  options: string[];
-  correct_answers: number[]; // JSONB array of correct answer indices
+  options: QuestionOption[];
+  correct_answers: string[]; // JSONB array of correct answer IDs
   hints: string[];
   topic: string;
   difficulty: 'easy' | 'medium' | 'hard';
+  year?: number;
+  subject?: string;
 }
 
 interface HistoricalProgress {
@@ -25,7 +33,7 @@ interface HistoricalProgress {
 
 interface QuizSession {
   sessionId: string;
-  userId: string;
+  userId: number;
   year: number;
   subject: string;
   topic: string;
@@ -33,6 +41,7 @@ interface QuizSession {
   currentQuestion: Question | null;
   abilityEstimate: number;
   questionsAnswered: number;
+  uniqueQuestionsAnswered: number;
   totalScore: number;
   currentTopicScore: number;
   weakTopicScore: number;
@@ -48,6 +57,10 @@ interface QuizSession {
   consecutiveWrongAnswers: number;
   hintsUsed: number;
   currentHintsUsed: number;
+  // Track per-question attempts for hint logic and repetition
+  questionAttempts: Map<number, { attempts: number; correct: boolean; hintsUsed: number }>;
+  // Questions that were answered incorrectly and can be repeated
+  incorrectQuestions: number[];
 }
 
 // In-memory session storage (in production, use Redis or database)
@@ -58,10 +71,11 @@ const quizSessions = new Map<string, QuizSession>();
 ------------------------------------------------------------------- */
 export const startAdaptiveQuiz = async (req: Request, res: Response) => {
   const { userId, year, subject, topic, maxQuestions = 10 } = req.body;
+  const parsedUserId = parseInt(userId);
 
   try {
     // Fetch historical progress
-    const historicalProgress = await getMergedUserProgress(userId) as HistoricalProgress[];
+    const historicalProgress = await getMergedUserProgress(parsedUserId) as HistoricalProgress[];
 
     // Fetch quiz questions
     const quizQuery = `
@@ -77,7 +91,7 @@ export const startAdaptiveQuiz = async (req: Request, res: Response) => {
 
     // Get questions
     const questionsQuery = `
-      SELECT qq.id, question, options, correct_answers, hints, qq.topic, difficulty
+      SELECT qq.id, question, options, correct_answers::jsonb as correct_answers, hints, qq.topic, difficulty
       FROM quiz_questions qq
       JOIN quizzes q ON qq.quiz_id = q.id
       WHERE q.year = $1 AND q.subject = $2 AND q.topic = $3
@@ -93,7 +107,7 @@ export const startAdaptiveQuiz = async (req: Request, res: Response) => {
 
     // Calculate initial ability and identify weak topics
     const initialAbility = calculateInitialAbility(historicalProgress, subject, year);
-    const weakTopics = identifyWeakTopics(historicalProgress, subject, year);
+    const weakTopics = await identifyWeakTopicsFromTable(parsedUserId, year, subject);
 
     // Use all available questions, capped at maxQuestions if specified
     const totalQuestions = Math.min(questions.length, maxQuestions);
@@ -102,7 +116,7 @@ export const startAdaptiveQuiz = async (req: Request, res: Response) => {
     const sessionId = `quiz_${userId}_${Date.now()}`;
     const session: QuizSession = {
       sessionId,
-      userId,
+      userId: parsedUserId,
       year,
       subject,
       topic,
@@ -110,6 +124,7 @@ export const startAdaptiveQuiz = async (req: Request, res: Response) => {
       currentQuestion: null,
       abilityEstimate: initialAbility,
       questionsAnswered: 0,
+      uniqueQuestionsAnswered: 0,
       totalScore: 0,
       currentTopicScore: 0,
       weakTopicScore: 0,
@@ -124,7 +139,9 @@ export const startAdaptiveQuiz = async (req: Request, res: Response) => {
       answeredQuestions: [],
       consecutiveWrongAnswers: 0,
       hintsUsed: 0,
-      currentHintsUsed: 0
+      currentHintsUsed: 0,
+      questionAttempts: new Map(),
+      incorrectQuestions: []
     };
 
     quizSessions.set(sessionId, session);
@@ -170,18 +187,13 @@ export const getNextQuestion = async (req: Request, res: Response) => {
   session.currentQuestion = nextQuestion;
   session.currentHintsUsed = 0;
 
-  // Determine if this is a weak topic question
-  const isWeakTopicQuestion = session.weakTopics.some(weakTopic =>
-    weakTopic.includes(nextQuestion.topic)
-  );
-
   res.json({
     id: nextQuestion.id,
     question: nextQuestion.question,
     options: nextQuestion.options,
     correct_answers: nextQuestion.correct_answers,
     hints: nextQuestion.hints,
-    isWeakTopicQuestion,
+    topic: nextQuestion.topic,
     progress: {
       current: session.questionsAnswered + 1,
       total: session.totalQuestions,
@@ -197,13 +209,13 @@ export const submitAnswer = async (req: Request, res: Response) => {
   const { sessionId } = req.params;
   const { questionId, answer, timeSpent } = req.body;
 
-  // SECURITY: Validate input parameters - answer can be number or array for multiple choice
+  // SECURITY: Validate input parameters - answer can be string ID or array of string IDs for multiple choice
   const isValidAnswer = (ans: any) => {
-    if (typeof ans === 'number') {
-      return ans >= 0 && ans <= 3;
+    if (typeof ans === 'string') {
+      return ans.length > 0; // Valid string ID
     }
     if (Array.isArray(ans)) {
-      return ans.every(a => typeof a === 'number' && a >= 0 && a <= 3);
+      return ans.every(a => typeof a === 'string' && a.length > 0);
     }
     return false;
   };
@@ -221,9 +233,10 @@ export const submitAnswer = async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Session not found or completed' });
   }
 
-  // SECURITY: Check if question was already answered
-  if (session.answeredQuestions.includes(questionId)) {
-    return res.status(400).json({ error: 'Question already answered' });
+  // Check if this is a repeated question (wrong questions can be repeated)
+  const isRepeatedQuestion = session.answeredQuestions.includes(questionId);
+  if (isRepeatedQuestion && !session.incorrectQuestions.includes(questionId)) {
+    return res.status(400).json({ error: 'Question already answered correctly' });
   }
 
   // Find the question
@@ -232,21 +245,46 @@ export const submitAnswer = async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Question not found' });
   }
 
-  // SECURITY: Server-side answer validation (supports multiple correct answers)
+  // SECURITY: Server-side answer validation (supports multiple correct answers with ID-based system)
   let isCorrect = false;
   if (Array.isArray(question.correct_answers)) {
-    // Multiple choice question
-    if (Array.isArray(answer)) {
-      // Check if all selected answers are correct and all correct answers are selected
-      isCorrect = answer.length === question.correct_answers.length &&
-                  answer.every(a => question.correct_answers.includes(a));
+    if (question.correct_answers.length === 1) {
+      // Single choice question
+      const correctAnswerId = question.correct_answers[0];
+      isCorrect = correctAnswerId === answer;
     } else {
-      // Single answer for multiple choice question (partial credit)
-      isCorrect = question.correct_answers.includes(answer);
+      // Multiple choice question
+      if (Array.isArray(answer)) {
+        // Check if all selected answers are correct and all correct answers are selected
+        isCorrect = answer.length === question.correct_answers.length &&
+                    answer.every(a => question.correct_answers.includes(a));
+      } else {
+        // Single answer for multiple choice question (partial credit)
+        isCorrect = question.correct_answers.includes(answer);
+      }
     }
   } else {
-    // Single choice question
-    isCorrect = Number(question.correct_answers) === answer;
+    // Fallback for non-array format (shouldn't happen with JSONB)
+    isCorrect = question.correct_answers === answer;
+  }
+
+  // Track per-question attempts
+  const existingAttempts = session.questionAttempts.get(questionId) || { attempts: 0, correct: false, hintsUsed: 0 };
+  const newAttempts = existingAttempts.attempts + 1;
+  session.questionAttempts.set(questionId, {
+    attempts: newAttempts,
+    correct: isCorrect,
+    hintsUsed: existingAttempts.hintsUsed
+  });
+
+  // Add to incorrect questions if wrong (for repetition)
+  if (!isCorrect && !session.incorrectQuestions.includes(questionId)) {
+    session.incorrectQuestions.push(questionId);
+  }
+
+  // Remove from incorrect questions if now correct
+  if (isCorrect && session.incorrectQuestions.includes(questionId)) {
+    session.incorrectQuestions = session.incorrectQuestions.filter(id => id !== questionId);
   }
 
   // SECURITY: Log suspicious activity
@@ -281,8 +319,8 @@ export const submitAnswer = async (req: Request, res: Response) => {
       timeBonus = scoringRules.timeBonus; // +5 points for answering within 30 seconds
     }
   } else {
-    // Partial credit for reasonable wrong answers (option 1 in multiple choice)
-    if (question.options && question.options.length >= 4 && answer === 1) {
+    // Partial credit for reasonable wrong answers (second option in multiple choice)
+    if (question.options && question.options.length >= 4 && answer === question.options[1]?.id) {
       partialCredit = (scoringRules.basePoints * difficultyMultiplier[question.difficulty]) * scoringRules.partialCredit;
       baseScore = partialCredit;
     } else {
@@ -318,6 +356,16 @@ export const submitAnswer = async (req: Request, res: Response) => {
   // Update consecutive wrong answers for hint logic
   session.consecutiveWrongAnswers = isCorrect ? 0 : session.consecutiveWrongAnswers + 1;
 
+  // Update weak topics in real-time for guardian monitoring
+  // Apply weighted updates for repeated questions to preserve cross-quiz remediation
+  try {
+    const isRepeatedQuestion = session.answeredQuestions.includes(questionId);
+    await updateWeakTopicsRealtime(session, question, isCorrect, isRepeatedQuestion);
+  } catch (error) {
+    console.error('Error updating weak topics:', error);
+    // Don't fail the quiz submission if weak topic update fails
+  }
+
   // Generate performance-based feedback
   const feedback = generatePerformanceFeedback(isCorrect, question.difficulty, answeredWithinTime, session.consecutiveWrongAnswers);
 
@@ -330,7 +378,6 @@ export const submitAnswer = async (req: Request, res: Response) => {
     answeredWithinTime,
     feedback,
     abilityEstimate: session.abilityEstimate,
-    isWeakTopicQuestion,
     sessionProgress: {
       current: session.questionsAnswered,
       total: session.totalQuestions,
@@ -344,10 +391,11 @@ export const submitAnswer = async (req: Request, res: Response) => {
 ------------------------------------------------------------------- */
 export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
   const { userId, year, subject, topic, maxQuestions = 10 } = req.body;
+  const parsedUserId = parseInt(userId);
 
   try {
     // Fetch historical progress
-    const historicalProgress = await getMergedUserProgress(userId) as HistoricalProgress[];
+    const historicalProgress = await getMergedUserProgress(parsedUserId) as HistoricalProgress[];
 
     // Fetch quiz questions
     const quizQuery = `
@@ -363,7 +411,7 @@ export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
 
     // Get questions
     const questionsQuery = `
-      SELECT qq.id, question, options, correct_answers, hints, qq.topic, difficulty
+      SELECT qq.id, question, options, correct_answers::jsonb as correct_answers, hints, qq.topic, difficulty
       FROM quiz_questions qq
       JOIN quizzes q ON qq.quiz_id = q.id
       WHERE q.year = $1 AND q.subject = $2 AND q.topic = $3
@@ -379,7 +427,7 @@ export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
 
     // Calculate initial ability and identify weak topics
     const initialAbility = calculateInitialAbility(historicalProgress, subject, year);
-    const weakTopics = identifyWeakTopics(historicalProgress, subject, year);
+    const weakTopics = await identifyWeakTopicsFromTable(parsedUserId, year, subject);
 
     // Use all available questions, capped at maxQuestions if specified
     const totalQuestions = Math.min(questions.length, maxQuestions);
@@ -388,7 +436,7 @@ export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
     const sessionId = `quiz_${userId}_${Date.now()}`;
     const session: QuizSession = {
       sessionId,
-      userId,
+      userId: parsedUserId,
       year,
       subject,
       topic,
@@ -396,6 +444,7 @@ export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
       currentQuestion: null,
       abilityEstimate: initialAbility,
       questionsAnswered: 0,
+      uniqueQuestionsAnswered: 0,
       totalScore: 0,
       currentTopicScore: 0,
       weakTopicScore: 0,
@@ -410,7 +459,9 @@ export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
       answeredQuestions: [],
       consecutiveWrongAnswers: 0,
       hintsUsed: 0,
-      currentHintsUsed: 0
+      currentHintsUsed: 0,
+      questionAttempts: new Map(),
+      incorrectQuestions: []
     };
 
     quizSessions.set(sessionId, session);
@@ -445,13 +496,18 @@ export const requestHint = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'No hints available for this question' });
   }
 
+  // Check per-question hint availability
+  const questionId = session.currentQuestion!.id;
+  const questionAttempts = session.questionAttempts.get(questionId) || { attempts: 0, correct: false, hintsUsed: 0 };
+  const wrongAttemptsForQuestion = questionAttempts.attempts - (questionAttempts.correct ? 1 : 0);
+
   // Adaptive hint threshold based on ability estimate
   const hintThreshold = getHintThreshold(session.abilityEstimate);
-  if (session.consecutiveWrongAnswers < hintThreshold) {
+  if (wrongAttemptsForQuestion < hintThreshold) {
     return res.status(400).json({
       error: 'Hint not available yet',
       requiredWrongAttempts: hintThreshold,
-      currentWrongAttempts: session.consecutiveWrongAnswers
+      currentWrongAttempts: wrongAttemptsForQuestion
     });
   }
 
@@ -539,15 +595,30 @@ export const getQuizProgress = async (req: Request, res: Response) => {
   const { userId, year, subject, topic } = req.params;
 
   try {
+    // First, get the quiz_id from year, subject, topic
+    const quizQuery = `
+      SELECT id FROM quizzes WHERE year = $1 AND subject = $2 AND topic = $3
+    `;
+    const quizResult = await pool.query(quizQuery, [year, subject, topic]);
+    if (quizResult.rows.length === 0) {
+      return res.json({
+        passed: false,
+        last_score: 0,
+        best_score: 0,
+        total_attempts: 0
+      });
+    }
+    const quizId = quizResult.rows[0].id;
+
     const query = `
       SELECT passed, last_score, best_score, total_attempts, last_activity
       FROM student_quiz_progress
-      WHERE user_id = $1 AND year = $2 AND subject = $3 AND topic = $4
+      WHERE user_id = $1 AND quiz_id = $2
       ORDER BY last_activity DESC
       LIMIT 1
     `;
 
-    const result = await pool.query(query, [userId, year, subject, topic]);
+    const result = await pool.query(query, [userId, quizId]);
 
     if (result.rows.length === 0) {
       return res.json({
@@ -597,6 +668,24 @@ function calculateInitialAbility(progress: HistoricalProgress[], subject: string
   return Math.max(0.2, Math.min(0.9, averageProgress));
 }
 
+async function identifyWeakTopicsFromTable(userId: number, year: number, subject: string): Promise<string[]> {
+  try {
+    const query = `
+      SELECT topic, weakness_score
+      FROM student_weak_topics
+      WHERE user_id = $1 AND year = $2 AND subject = $3 AND weakness_score > 0.3
+      ORDER BY weakness_score DESC
+      LIMIT 3
+    `;
+
+    const result = await pool.query(query, [userId, year, subject]);
+    return result.rows.map(row => `${year}-${subject}-${row.topic}`);
+  } catch (error) {
+    console.error('Error identifying weak topics from table:', error);
+    return [];
+  }
+}
+
 function identifyWeakTopics(progress: HistoricalProgress[], subject: string, year: number): string[] {
   return progress
     .filter(p => {
@@ -611,6 +700,17 @@ function identifyWeakTopics(progress: HistoricalProgress[], subject: string, yea
 
 function selectNextQuestion(session: QuizSession): Question | null {
   if (session.questionsAnswered >= session.totalQuestions) return null;
+
+  // First, check if we should repeat an incorrect question (after 70% of questions answered)
+  const isRepetitionPhase = session.questionsAnswered >= session.totalQuestions * 0.7;
+  if (isRepetitionPhase && session.incorrectQuestions.length > 0) {
+    // Select a random incorrect question to repeat
+    const questionIdToRepeat = session.incorrectQuestions[Math.floor(Math.random() * session.incorrectQuestions.length)];
+    const questionToRepeat = session.availableQuestions.find(q => q.id === questionIdToRepeat);
+    if (questionToRepeat) {
+      return questionToRepeat;
+    }
+  }
 
   // First 30% of questions: prioritize weak topics
   const isRemediationPhase = session.questionsAnswered < session.totalQuestions * 0.3;
@@ -714,6 +814,77 @@ function generatePerformanceFeedback(isCorrect: boolean, difficulty: string, ans
   }
 }
 
+
+
+async function updateWeakTopicsRealtime(session: QuizSession, question: Question, isCorrect: boolean, isRepeatedQuestion: boolean = false) {
+  const topicKey = `${question.year || session.year}-${question.subject || session.subject}-${question.topic}`;
+
+  // Get current weakness score for this topic
+  const currentQuery = await pool.query(
+    `SELECT weakness_score FROM student_weak_topics
+     WHERE user_id = $1 AND year = $2 AND subject = $3 AND topic = $4`,
+    [session.userId, question.year || session.year, question.subject || session.subject, question.topic]
+  );
+
+  let currentScore = 0.5; // Default starting score
+  if (currentQuery.rows.length > 0) {
+    currentScore = parseFloat(currentQuery.rows[0].weakness_score);
+  }
+
+  // Calculate new weakness score based on performance
+  let newScore = currentScore;
+
+  // Apply weighted updates for repeated questions (60% less impact)
+  const repetitionWeight = isRepeatedQuestion ? 0.4 : 1.0;
+
+  if (isCorrect) {
+    // Reduce weakness score when correct (improve faster for weak topics)
+    const improvementRate = currentScore > 0.7 ? 0.05 : 0.03; // Faster improvement for very weak topics
+    const weightedImprovement = improvementRate * repetitionWeight;
+    newScore = Math.max(0.0, currentScore - weightedImprovement);
+  } else {
+    // Increase weakness score when incorrect
+    const declineRate = currentScore < 0.3 ? 0.08 : 0.05; // Faster decline for strong topics
+    const weightedDecline = declineRate * repetitionWeight;
+    newScore = Math.min(1.0, currentScore + weightedDecline);
+  }
+
+  // Determine improvement trend
+  let improvementTrend = 'stable';
+  if (newScore < currentScore) {
+    improvementTrend = 'improving';
+  } else if (newScore > currentScore) {
+    improvementTrend = 'declining';
+  }
+
+  // Update or insert weak topic record
+  await pool.query(
+    `INSERT INTO student_weak_topics
+      (user_id, year, subject, topic, weakness_score, last_updated, improvement_trend, remediation_attempts)
+     VALUES ($1, $2, $3, $4, $5, NOW(), $6, 1)
+     ON CONFLICT (user_id, year, subject, topic)
+     DO UPDATE SET
+       weakness_score = $5,
+       last_updated = NOW(),
+       improvement_trend = $6,
+       remediation_attempts = student_weak_topics.remediation_attempts + 1`,
+    [
+      session.userId,
+      question.year || session.year,
+      question.subject || session.subject,
+      question.topic,
+      newScore,
+      improvementTrend
+    ]
+  );
+
+  // If topic is no longer weak (score < 0.3), consider removing from active weak topics
+  if (newScore < 0.3) {
+    // Optionally remove from session's weak topics list for future questions
+    session.weakTopics = session.weakTopics.filter(wt => !wt.includes(question.topic));
+  }
+}
+
 async function saveQuizResults(session: QuizSession, currentTopicPercentage: number) {
   // Get quiz ID for the attempt logging
   const quizQuery = await pool.query(
@@ -730,16 +901,16 @@ async function saveQuizResults(session: QuizSession, currentTopicPercentage: num
   // Get next attempt number for this user and quiz
   const attemptQuery = await pool.query(
     `SELECT COALESCE(MAX(attempt_number), 0) + 1 as next_attempt
-     FROM quiz_attempt
+     FROM quiz_attempts
      WHERE user_id = $1 AND quiz_id = $2`,
     [session.userId, quizId]
   );
 
   const attemptNumber = attemptQuery.rows[0].next_attempt;
 
-  // Save detailed attempt to quiz_attempt table
+  // Save detailed attempt to quiz_attempts table
   await pool.query(
-    `INSERT INTO quiz_attempt
+    `INSERT INTO quiz_attempts
       (user_id, quiz_id, attempt_number, score, time_taken, questions_answered, total_questions, ability_estimate, passed)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
     [
@@ -755,31 +926,13 @@ async function saveQuizResults(session: QuizSession, currentTopicPercentage: num
     ]
   );
 
-  // Save to quiz progress (aggregated data)
-  await pool.query(
-    `INSERT INTO student_quiz_progress
-      (user_id, year, subject, topic, difficulty_level,
-       total_attempts, correct_attempts, best_score, last_score, passed, last_activity)
-     VALUES ($1, $2, $3, $4, 'adaptive', 1, $5, $6, $6, $7, NOW())
-     ON CONFLICT (user_id, year, subject, topic)
-     DO UPDATE SET
-       total_attempts = student_quiz_progress.total_attempts + 1,
-       correct_attempts = CASE WHEN $6 > student_quiz_progress.last_score
-                               THEN student_quiz_progress.correct_attempts + $5
-                               ELSE student_quiz_progress.correct_attempts END,
-       best_score = GREATEST(student_quiz_progress.best_score, $6),
-       last_score = $6,
-       passed = $7,
-       last_activity = NOW()`,
-    [
-      session.userId,
-      session.year,
-      session.subject,
-      session.topic,
-      session.currentTopicScore,
-      Math.round(currentTopicPercentage),
-      currentTopicPercentage >= 60
-    ]
+  // Save to quiz progress (aggregated data) using the updated recordQuizAttempt function
+  await recordQuizAttempt(
+    session.userId,
+    quizId,
+    Math.round(currentTopicPercentage),
+    session.totalQuestions,
+    'adaptive'
   );
 }
 

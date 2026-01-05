@@ -13,14 +13,20 @@ export interface BackendQuiz {
   question_count?: number;
 }
 
+export interface QuestionOption {
+  id: string;
+  text: string;
+}
+
 export interface Question {
   id?: number;
   questionText: string;
-  options: string[];
-  correctAnswers: number[] | string[];
+  options: QuestionOption[];
+  correctAnswers: string[]; // Array of option IDs
   answerType: 'single' | 'multiple';
   difficulty: 'easy' | 'medium' | 'hard';
   hints?: string[];
+  topic?: string;
   targets?: Record<string, unknown>[];
 }
 
@@ -54,7 +60,11 @@ class QuizService {
 
   async getQuiz(id: number) {
     const response = await axios.get(`/admin/${id}`);
-    return response.data;
+    return {
+      ...response.data,
+      quizType: response.data.quiz_type || 'mcq',
+      questionCount: response.data.question_count || response.data.questionCount || 0
+    };
   }
 
   async createQuiz(quizData: unknown) {

@@ -1,5 +1,7 @@
 import { Card } from '@/components/ui/card';
 import { CheckCircle2, XCircle, Zap, Minus } from 'lucide-react';
+import { playCorrectSound, playLoseSound } from '@/lib/sound';
+import { useEffect } from 'react';
 
 interface QuizFeedbackProps {
   isCorrect: boolean;
@@ -18,6 +20,15 @@ export function QuizFeedback({
   totalPoints,
   feedback
 }: QuizFeedbackProps) {
+  // Play lose sound when student gets wrong answer during feedback
+  useEffect(() => {
+    if (!isCorrect) {
+      playLoseSound();
+    } else {
+      playCorrectSound();
+    }
+  }, [isCorrect]);
+
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 flex items-center justify-center z-50 p-4">
       <Card

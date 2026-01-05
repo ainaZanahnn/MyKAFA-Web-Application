@@ -24,14 +24,19 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // Log errors for debugging
-    console.error('API Error:', error);
+    // Log errors for debugging, but skip for token verification to avoid noise during initialization
+    const isVerifyRequest = error.config?.url?.includes('/auth/verify');
+    if (!isVerifyRequest) {
+      console.error('API Error:', error);
+    }
 
     // Handle different error types
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
-      console.error(`HTTP ${status} Error:`, data);
+      if (!isVerifyRequest) {
+        console.error(`HTTP ${status} Error:`, data);
+      }
 
       // Retry logic for rate limiting (429) errors
       if (status === 429 && !error.config._retry) {

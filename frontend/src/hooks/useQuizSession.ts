@@ -14,6 +14,7 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<QuestionResponse | null>(null);
   const [session, setSession] = useState<QuizSession | null>(null);
+  const [weakTopics, setWeakTopics] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(false);
   const [quizStarted, setQuizStarted] = useState(false);
@@ -24,6 +25,9 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
 
   // Answer feedback state
   const [lastAnswerResult, setLastAnswerResult] = useState<AnswerResponse | null>(null);
+
+  // Track per-question attempts for hint logic
+  const [questionAttempts, setQuestionAttempts] = useState<Map<number, { attempts: number; correct: boolean; hintsUsed: number }>>(new Map());
 
   /**
    * Initialize quiz session when component mounts
@@ -53,6 +57,7 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
       );
 
       setSessionId(sessionData.sessionId);
+      setWeakTopics(sessionData.weakTopics || []);
 
       // Initialize frontend session state for adaptive hints
       const initialSession: QuizSession = {
@@ -68,7 +73,8 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
         hintsUsed: 0,
         totalQuestions: settings.maxQuestions,
         questionHistory: [],
-        currentQuestion: null
+        currentQuestion: null,
+        weakTopics: sessionData.weakTopics || []
       };
 
       setSession(initialSession);
@@ -122,14 +128,42 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
     try {
       setIsLoading(true);
 
+      // Convert answer indices to option IDs for backend compatibility
+      let backendAnswer: string | string[];
+      if (Array.isArray(answer)) {
+        // Multiple choice: convert indices to option IDs
+        backendAnswer = answer.map(index => currentQuestion.options[index]?.id || index.toString());
+      } else {
+        // Single choice: convert index to option ID
+        backendAnswer = currentQuestion.options[answer]?.id || answer.toString();
+      }
+
       const result = await adaptiveQuizService.submitAnswer(
         sessionId,
         currentQuestion.id,
-        answer,
+        backendAnswer,
         timeSpent
       );
 
       setLastAnswerResult(result);
+
+      // Update per-question attempts for hint logic
+      const questionId = currentQuestion.id;
+      const existingAttempts = questionAttempts.get(questionId) || { attempts: 0, correct: false, hintsUsed: 0 };
+      const newAttempts = existingAttempts.attempts + 1;
+      setQuestionAttempts(prev => new Map(prev).set(questionId, {
+        attempts: newAttempts,
+        correct: result.isCorrect,
+        hintsUsed: existingAttempts.hintsUsed
+      }));
+
+      // Update session ability estimate
+      if (session) {
+        setSession({
+          ...session,
+          abilityEstimate: result.abilityEstimate
+        });
+      }
 
       return result;
     } catch (error) {
@@ -153,6 +187,14 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
       setCurrentHint(hintResponse.hint);
       setShowHint(true);
 
+      // Update per-question hints used
+      const questionId = currentQuestion.id;
+      const existingAttempts = questionAttempts.get(questionId) || { attempts: 0, correct: false, hintsUsed: 0 };
+      setQuestionAttempts(prev => new Map(prev).set(questionId, {
+        ...existingAttempts,
+        hintsUsed: existingAttempts.hintsUsed + 1
+      }));
+
       // Update session score after hint penalty
       if (session) {
         setSession({
@@ -171,9 +213,22 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
    * Check if hints are available for current question
    */
   const canShowHint = () => {
-    if (!currentQuestion || !sessionId) return false;
-    // Hints are available if the question has hints and we're in an active session
-    return currentQuestion.hints && currentQuestion.hints.length > 0;
+    if (!currentQuestion || !sessionId || !session) return false;
+
+    // Check if question has hints
+    if (!currentQuestion.hints || currentQuestion.hints.length === 0) return false;
+
+    // Get per-question attempts for this specific question
+    const questionId = currentQuestion.id;
+    const attempts = questionAttempts.get(questionId) || { attempts: 0, correct: false, hintsUsed: 0 };
+    const wrongAttemptsForQuestion = attempts.attempts - (attempts.correct ? 1 : 0);
+
+    // Adaptive hint threshold based on ability estimate
+    const hintThreshold = session.abilityEstimate < 0.3 ? 2 :
+                         session.abilityEstimate < 0.6 ? 3 : 4;
+
+    // Hints are available after wrong attempts for this specific question
+    return wrongAttemptsForQuestion >= hintThreshold;
   };
 
   /**
@@ -183,10 +238,12 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
     setSessionId(null);
     setCurrentQuestion(null);
     setSession(null);
+    setWeakTopics([]);
     setQuizStarted(false);
     setCurrentHint(null);
     setShowHint(false);
     setLastAnswerResult(null);
+    setQuestionAttempts(new Map());
   };
 
   return {
@@ -194,6 +251,7 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
     sessionId,
     currentQuestion,
     session,
+    weakTopics,
     isLoading,
     isLoadingQuestion,
     quizStarted,

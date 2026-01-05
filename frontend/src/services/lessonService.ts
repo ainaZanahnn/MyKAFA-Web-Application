@@ -138,6 +138,13 @@ class LessonService {
     });
     return response.data;
   }
+
+  async viewLessonMaterial(lessonId: number, materialId: number): Promise<Blob> {
+    const response = await apiClient.get(`/lessons/${lessonId}/materials/${materialId}/view`, {
+      responseType: 'blob'
+    });
+    return new Blob([response.data], { type: response.headers['content-type'] });
+  }
 }
 
 export default new LessonService();

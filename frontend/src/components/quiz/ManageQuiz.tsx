@@ -22,6 +22,7 @@ export const ManageQuiz: React.FC<ManageQuizProps> = ({ onSave, onCancel, initia
   const [year, setYear] = useState<number | null>(null);
   const [subject, setSubject] = useState('');
   const [topic, setTopic] = useState('');
+  const [quizType, setQuizType] = useState('mcq');
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [activeTab, setActiveTab] = useState<'questions' | 'adaptive'>('questions');
@@ -34,6 +35,7 @@ export const ManageQuiz: React.FC<ManageQuizProps> = ({ onSave, onCancel, initia
       setYear(initialQuiz.year);
       setSubject(initialQuiz.subject);
       setTopic(initialQuiz.topic);
+      setQuizType(initialQuiz.quizType || 'mcq');
       setQuestions(initialQuiz.questions);
       setAdaptiveSettings(initialQuiz.adaptiveSettings || defaultAdaptiveSettings);
     }
@@ -89,10 +91,17 @@ export const ManageQuiz: React.FC<ManageQuizProps> = ({ onSave, onCancel, initia
   const filteredAvailableTopics = availableTopics.filter(topic => !existingQuizTopics.includes(topic));
 
   const handleAddQuestion = () => {
+    const generateOptionId = () => `opt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     const newQuestion: Question = {
       id: Date.now(),
       questionText: '',
-      options: ['', '', '', ''],
+      options: [
+        { id: generateOptionId(), text: '' },
+        { id: generateOptionId(), text: '' },
+        { id: generateOptionId(), text: '' },
+        { id: generateOptionId(), text: '' }
+      ],
       correctAnswers: [],
       answerType: 'single',
       difficulty: 'medium'
@@ -116,7 +125,7 @@ export const ManageQuiz: React.FC<ManageQuizProps> = ({ onSave, onCancel, initia
         year: year || 0,
         subject,
         topic,
-        quizType: 'mcq', // Default quiz type
+        quizType: quizType,
         questions,
         adaptiveSettings
       };
@@ -153,12 +162,12 @@ export const ManageQuiz: React.FC<ManageQuizProps> = ({ onSave, onCancel, initia
         year={year}
         subject={subject}
         topic={topic}
-        quizType={'mcq'}
+        quizType={quizType}
         availableTopics={filteredAvailableTopics}
         onYearChange={setYear}
         onSubjectChange={setSubject}
         onTopicChange={setTopic}
-        onQuizTypeChange={() => {}}
+        onQuizTypeChange={setQuizType}
       />
 
       <div className="space-y-6">
@@ -206,10 +215,10 @@ export const ManageQuiz: React.FC<ManageQuizProps> = ({ onSave, onCancel, initia
 
               {questions.map((question, index) => (
                 <QuestionCard
-                  key={question.id || index}
+                  key={`question-${index}`}
                   question={question}
                   index={index}
-                  quizType={'mcq'}
+                  quizType={quizType}
                   onRemoveQuestion={handleRemoveQuestion}
                   onUpdateQuestion={handleUpdateQuestion}
                 />

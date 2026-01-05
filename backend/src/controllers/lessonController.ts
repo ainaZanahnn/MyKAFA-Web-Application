@@ -442,7 +442,10 @@ export const deleteLesson = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Lesson not found' });
     }
 
-    // Delete materials first (due to foreign key constraint)
+    // Delete related student progress records first (due to foreign key constraint)
+    await pool.query('DELETE FROM student_progress WHERE lesson_id = $1', [id]);
+
+    // Delete materials (due to foreign key constraint)
     await pool.query('DELETE FROM lesson_materials WHERE lesson_id = $1', [id]);
 
     // Delete lesson

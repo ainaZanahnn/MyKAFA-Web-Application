@@ -83,6 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await refreshToken();
           }
         }
+      } else if (storedRefreshToken) {
+        // No token but have refresh token, try to refresh
+        await refreshToken();
       }
       setIsLoading(false);
     };

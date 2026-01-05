@@ -138,7 +138,8 @@ export const getQuizById = async (req: Request, res: Response) => {
       ...q,
       options: Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]'),
       correctAnswers: Array.isArray(q.correctAnswers) ? q.correctAnswers : JSON.parse(q.correctAnswers || '[]'),
-      hints: q.hints ? (Array.isArray(q.hints) ? q.hints : JSON.parse(q.hints)) : null
+      hints: q.hints ? (Array.isArray(q.hints) ? q.hints : JSON.parse(q.hints)) : null,
+      answerType: (Array.isArray(q.correctAnswers) ? q.correctAnswers : JSON.parse(q.correctAnswers || '[]')).length === 1 ? 'single' : 'multiple'
     }));
 
     const quiz = {
@@ -360,6 +361,25 @@ export const getQuizStatsForStudent = async (req: AuthenticatedRequest, res: Res
   }
 
   try {
+    // First, get the quiz_id from year, subject, topic
+    const quizQuery = `
+      SELECT id FROM quizzes WHERE year = $1 AND subject = $2 AND topic = $3
+    `;
+    const quizResult = await pool.query(quizQuery, [year, subject, topic]);
+    if (quizResult.rows.length === 0) {
+      return res.json({
+        stats: {
+          totalAttempts: 0,
+          bestScore: 0,
+          lastScore: 0,
+          passed: false,
+          lastActivity: null
+        },
+        success: true
+      });
+    }
+    const quizId = quizResult.rows[0].id;
+
     // Get quiz statistics from student_quiz_progress
     const statsQuery = `
       SELECT
@@ -369,10 +389,10 @@ export const getQuizStatsForStudent = async (req: AuthenticatedRequest, res: Res
         passed,
         last_activity
       FROM student_quiz_progress
-      WHERE user_id = $1 AND year = $2 AND subject = $3 AND topic = $4
+      WHERE user_id = $1 AND quiz_id = $2
     `;
 
-    const statsResult = await pool.query(statsQuery, [userId, year, subject, topic]);
+    const statsResult = await pool.query(statsQuery, [userId, quizId]);
 
     let stats = {
       totalAttempts: 0,

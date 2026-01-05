@@ -89,17 +89,15 @@ export const completeQuiz = async (
 ) => {
   try {
     const userId = req.user?.id;
-    const { year, subject, topic, score, passed } = req.body;
+    const { quizId, score, passed } = req.body;
 
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
-    if (!year || !subject || !topic || score == null || passed == null)
-      return res.status(400).json({ message: "All quiz info required" });
+    if (!quizId || score == null || passed == null)
+      return res.status(400).json({ message: "Quiz ID, score, and passed status required" });
 
     const updated = await updateQuizProgress(
       userId,
-      year,
-      subject,
-      topic,
+      quizId,
       score,
       passed
     );

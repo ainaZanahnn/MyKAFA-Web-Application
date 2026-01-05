@@ -4,6 +4,7 @@ import { Progress } from '@/components/ui/progress';
 import { Clock, Lightbulb, Star } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { QuestionResponse } from '@/lib/AdaptiveQuizService';
+import { playSelectSound } from '@/lib/sound';
 
 interface QuizQuestionProps {
   question: QuestionResponse;
@@ -15,6 +16,7 @@ interface QuizQuestionProps {
   onUseHint: () => void;
   onSubmit: () => void;
   canShowHint: boolean;
+  weakTopics?: string[];
 }
 
 export function QuizQuestion({
@@ -26,7 +28,8 @@ export function QuizQuestion({
   onAnswerSelect,
   onUseHint,
   onSubmit,
-  canShowHint
+  canShowHint,
+  weakTopics = []
 }: QuizQuestionProps) {
   const [showRemedialOverlay, setShowRemedialOverlay] = useState(false);
 
@@ -38,26 +41,35 @@ export function QuizQuestion({
 
   const progressPercentage = (timeLeft / 30) * 100;
 
-  // Show remedial overlay when weak topic question appears
+  // Show remedial overlay when weak topic question appears (frontend calculation)
   useEffect(() => {
-    if (question.isWeakTopicQuestion) {
+    const isWeakTopicQuestion = weakTopics.some(weakTopic =>
+      weakTopic.includes(question.topic)
+    );
+
+    if (isWeakTopicQuestion) {
       setShowRemedialOverlay(true);
       const timer = setTimeout(() => {
         setShowRemedialOverlay(false);
       }, 4000);
       return () => clearTimeout(timer);
     }
-  }, [question.id, question.isWeakTopicQuestion]);
+  }, [question.id, question.topic, weakTopics]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 flex items-center justify-center p-4">
-      {/* Remedial Question Overlay */}
+      {/* Remedial Overlay */}
       {showRemedialOverlay && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-3xl shadow-2xl border-4 border-red-200 max-w-sm mx-4 text-center">
-            <div className="text-5xl mb-3">📚</div>
-            <h3 className="text-xl font-black text-gray-900 mb-2">Soalan Remedial</h3>
-            <p className="text-gray-600 text-base">Soalan ini mensasarkan topik lemah untuk membantu anda meningkat!</p>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-gradient-to-br from-blue-600 to-purple-600 p-8 rounded-2xl border-4 border-white/20 shadow-2xl max-w-md mx-4">
+            <div className="text-center">
+              <div className="text-6xl mb-4">📚</div>
+              <h3 className="text-2xl font-black text-white mb-2">Topik Lemah Dikesan!</h3>
+              <p className="text-white/90 text-lg">
+                Soalan ini adalah dari topik yang anda perlukan latihan tambahan.
+                Teruskan usaha yang baik!
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -123,6 +135,19 @@ export function QuizQuestion({
               </div>
             </div>
 
+            {/* Remedial Indicator */}
+            {weakTopics.some(weakTopic => weakTopic.includes(question.topic)) && (
+              <div className="flex items-center gap-2 mb-3">
+                <div className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-3 py-1 rounded-full font-black text-sm shadow-lg border-2 border-white/20">
+                  <span className="mr-1">🔄</span>
+                  Remedial Question
+                </div>
+                <span className="text-white/80 text-sm font-semibold">
+                  Practice for weak topic: {question.topic}
+                </span>
+              </div>
+            )}
+
             {/* Question Text */}
             <h2 className="text-2xl font-black text-white leading-relaxed mb-2">{question.question}</h2>
           </div>
@@ -154,13 +179,15 @@ export function QuizQuestion({
             <div className="grid grid-cols-2 gap-3 mb-6">
               {question.options.map((option, index) => {
                 const letters = ["A", "B", "C", "D"]
-                const isMultipleChoice = Array.isArray(question.correct_answers);
+                const isMultipleChoice = Array.isArray(question.correct_answers) && question.correct_answers.length > 1;
                 const isSelected = isMultipleChoice
                   ? Array.isArray(selectedAnswer) && selectedAnswer.includes(index)
                   : selectedAnswer === index;
 
                 const handleClick = () => {
                   console.log('Button clicked:', index, 'isMultipleChoice:', isMultipleChoice);
+                  // Play select sound when student clicks answer
+                  playSelectSound();
                   if (isMultipleChoice) {
                     // For multiple choice: toggle selection in array
                     const currentSelections = Array.isArray(selectedAnswer) ? selectedAnswer : [];
@@ -197,7 +224,7 @@ export function QuizQuestion({
                       >
                         {letters[index]}
                       </div>
-                      <span className="text-lg">{option}</span>
+                      <span className="text-lg">{option.text}</span>
                     </div>
                   </button>
                 )

@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { defaultAdaptiveSettings } from "../../lib/quiz-constants";
-import quizService, { type BackendQuiz } from "../../services/quizService";
+import quizService, { type BackendQuiz, type QuestionOption } from "../../services/quizService";
 import type { QuizData, Question } from "../../components/admin/quiztable";
 import { toast } from "react-toastify";
 
@@ -33,17 +33,19 @@ export default function ManageQuizPage() {
       try {
         const response = await quizService.getQuizzes();
         // Transform backend data to match QuizData interface
-        const transformedQuizzes: QuizData[] = (response.quizzes || []).map((quiz: BackendQuiz) => ({
-          id: quiz.id,
-          year: quiz.year,
-          subject: quiz.subject,
-          topic: quiz.topic,
-          quizType: 'mcq', // Default, can be updated based on actual data
-          questions: [], // Will be populated when needed
-          questionCount: quiz.questionCount || quiz.question_count,
-          adaptiveSettings: defaultAdaptiveSettings,
-          status: quiz.status as 'draf' | 'diterbitkan' | 'diarkibkan'
-        }));
+        const transformedQuizzes: QuizData[] = (response.quizzes || [])
+          .filter((quiz: BackendQuiz) => quiz.id) // Filter out quizzes without id
+          .map((quiz: BackendQuiz) => ({
+            id: quiz.id,
+            year: quiz.year,
+            subject: quiz.subject,
+            topic: quiz.topic,
+            quizType: 'mcq', // Default, can be updated based on actual data
+            questions: [], // Will be populated when needed
+            questionCount: quiz.questionCount || quiz.question_count,
+            adaptiveSettings: defaultAdaptiveSettings,
+            status: quiz.status as 'draf' | 'diterbitkan' | 'diarkibkan'
+          }));
         setQuizzes(transformedQuizzes);
       } catch (error) {
         console.error('Error fetching quizzes:', error);
@@ -113,8 +115,13 @@ export default function ManageQuizPage() {
 
   const handleEditQuiz = async (quiz: QuizData, index: number) => {
     try {
+      if (!quiz.id) {
+        alert('Quiz ID is missing. Cannot edit this quiz.');
+        return;
+      }
+
       // Fetch full quiz data including questions
-      const response = await quizService.getQuiz(quiz.id as number);
+      const response = await quizService.getQuiz(quiz.id);
       const fullQuiz = response.quiz;
 
       // Transform backend data to match QuizData interface
@@ -125,10 +132,21 @@ export default function ManageQuizPage() {
         correctAnswers?: unknown;
         difficulty?: string;
         hints?: unknown;
-      }) => ({
-        id: q.id || 0,
+      }, index: number) => ({
+        id: q.id || (Date.now() + Math.random() + index),
         questionText: q.questionText || '',
-        options: Array.isArray(q.options) && q.options.length > 0 ? q.options : ['', '', '', ''],
+        options: Array.isArray(q.options) && q.options.length > 0
+          ? q.options.map((opt: unknown, index: number) =>
+              typeof opt === 'string'
+                ? { id: `opt_legacy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, text: opt }
+                : opt as QuestionOption
+            )
+          : [
+              { id: `opt_new_${q.id}_1`, text: '' },
+              { id: `opt_new_${q.id}_2`, text: '' },
+              { id: `opt_new_${q.id}_3`, text: '' },
+              { id: `opt_new_${q.id}_4`, text: '' }
+            ],
         correctAnswers: Array.isArray(q.correctAnswers) ? q.correctAnswers : [],
         answerType: (Array.isArray(q.correctAnswers) && q.correctAnswers.length > 1) ? 'multiple' : 'single',
         difficulty: q.difficulty || 'medium',
@@ -140,10 +158,15 @@ export default function ManageQuizPage() {
         year: fullQuiz.year || 0,
         subject: fullQuiz.subject,
         topic: fullQuiz.topic,
-        quizType: fullQuiz.quizType || 'mcq',
+        quizType: fullQuiz.quiz_type || 'mcq',
+        quiz_type: fullQuiz.quiz_type,
         questions: transformedQuestions,
         questionCount: transformedQuestions.length,
-        adaptiveSettings: defaultAdaptiveSettings
+        question_count: transformedQuestions.length,
+        adaptiveSettings: defaultAdaptiveSettings,
+        status: fullQuiz.status as 'draf' | 'diterbitkan' | 'diarkibkan',
+        created_at: fullQuiz.created_at,
+        updated_at: fullQuiz.updated_at
       };
 
       setEditingQuiz(transformedQuiz);

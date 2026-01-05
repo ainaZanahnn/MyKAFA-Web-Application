@@ -142,6 +142,7 @@ export const updatePaperController = async (req: Request, res: Response) => {
     const { id } = req.params;
     const paperId = parseInt(id, 10);
     const updates = req.body;
+    const file = req.file;
 
     if (isNaN(paperId)) {
       return res.status(400).json({
@@ -156,6 +157,11 @@ export const updatePaperController = async (req: Request, res: Response) => {
         success: false,
         message: "Format tahun tidak sah (gunakan 4 digit).",
       });
+    }
+
+    // Handle file upload if provided
+    if (file) {
+      updates.file_path = file.filename || file.originalname;
     }
 
     const updatedPaper = await updatePaper(paperId, updates);

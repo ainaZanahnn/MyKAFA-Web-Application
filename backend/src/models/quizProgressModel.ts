@@ -8,12 +8,8 @@ import pool from "../config/db";
 export interface QuizProgress {
   id?: number;
   user_id: number;
-  year: number;
-  subject: string;
-  topic: string;
-  difficulty_level?: string;
+  quiz_id: number; // FK to quizzes table
   total_attempts?: number;
-  correct_attempts?: number;
   best_score?: number;
   last_score?: number;
   passed?: boolean;
@@ -27,12 +23,8 @@ export interface QuizProgress {
 export const createQuizProgress = async (progress: QuizProgress) => {
   const {
     user_id,
-    year,
-    subject,
-    topic,
-    difficulty_level,
+    quiz_id,
     total_attempts,
-    correct_attempts,
     best_score,
     last_score,
     passed,
@@ -40,18 +32,13 @@ export const createQuizProgress = async (progress: QuizProgress) => {
 
   const result = await pool.query(
     `INSERT INTO student_quiz_progress
-      (user_id, year, subject, topic, difficulty_level,
-       total_attempts, correct_attempts, best_score, last_score, passed)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      (user_id, quiz_id, total_attempts, best_score, last_score, passed, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW())
      RETURNING *`,
     [
       user_id,
-      year,
-      subject,
-      topic,
-      difficulty_level || "normal",
+      quiz_id,
       total_attempts || 0,
-      correct_attempts || 0,
       best_score || 0,
       last_score || 0,
       passed || false,
@@ -62,18 +49,16 @@ export const createQuizProgress = async (progress: QuizProgress) => {
 };
 
 /* -------------------------------------------------------------------
-   GET QUIZ PROGRESS FOR 1 TOPIC
+   GET QUIZ PROGRESS FOR 1 QUIZ
 ------------------------------------------------------------------- */
 export const getQuizProgress = async (
   user_id: number,
-  year: number,
-  subject: string,
-  topic: string
+  quiz_id: number
 ) => {
   const result = await pool.query(
     `SELECT * FROM student_quiz_progress
-     WHERE user_id = $1 AND year = $2 AND subject = $3 AND topic = $4`,
-    [user_id, year, subject, topic]
+     WHERE user_id = $1 AND quiz_id = $2`,
+    [user_id, quiz_id]
   );
 
   return result.rows[0];
@@ -84,29 +69,22 @@ export const getQuizProgress = async (
 ------------------------------------------------------------------- */
 export const recordQuizAttempt = async (
   user_id: number,
-  year: number,
-  subject: string,
-  topic: string,
+  quiz_id: number,
   score: number,
   totalQuestions: number,
   difficulty: string
 ) => {
   // Get existing progress
-  let progress = await getQuizProgress(user_id, year, subject, topic);
+  let progress = await getQuizProgress(user_id, quiz_id);
 
   const isPass = score >= Math.ceil(totalQuestions * 0.75); // 75% threshold for mastery
-  const correct = score;
 
   // Create new entry if not exist
   if (!progress) {
     return await createQuizProgress({
       user_id,
-      year,
-      subject,
-      topic,
-      difficulty_level: difficulty,
+      quiz_id,
       total_attempts: 1,
-      correct_attempts: correct,
       best_score: score,
       last_score: score,
       passed: isPass,
@@ -115,31 +93,24 @@ export const recordQuizAttempt = async (
 
   // Update progress
   const updatedAttempts = progress.total_attempts + 1;
-  const updatedCorrect = progress.correct_attempts + correct;
   const updatedBest = Math.max(progress.best_score, score);
 
   const result = await pool.query(
     `UPDATE student_quiz_progress
-     SET difficulty_level = $1,
-         total_attempts = $2,
-         correct_attempts = $3,
-         best_score = $4,
-         last_score = $5,
-         passed = $6,
+     SET total_attempts = $1,
+         best_score = $2,
+         last_score = $3,
+         passed = $4,
          last_activity = NOW()
-     WHERE user_id = $7 AND year = $8 AND subject = $9 AND topic = $10
+     WHERE user_id = $5 AND quiz_id = $6
      RETURNING *`,
     [
-      difficulty,
       updatedAttempts,
-      updatedCorrect,
       updatedBest,
       score,
       isPass || progress.passed, // once passed, stay passed
       user_id,
-      year,
-      subject,
-      topic,
+      quiz_id,
     ]
   );
 
@@ -151,9 +122,11 @@ export const recordQuizAttempt = async (
 ------------------------------------------------------------------- */
 export const getUserQuizProgress = async (user_id: number) => {
   const result = await pool.query(
-    `SELECT * FROM student_quiz_progress
-     WHERE user_id = $1
-     ORDER BY year, subject, topic`,
+    `SELECT sqp.*, q.year, q.subject, q.topic
+     FROM student_quiz_progress sqp
+     JOIN quizzes q ON sqp.quiz_id = q.id
+     WHERE sqp.user_id = $1
+     ORDER BY q.year, q.subject, q.topic`,
     [user_id]
   );
 
@@ -169,7 +142,16 @@ export const getTopicQuizPassStatus = async (
   subject: string,
   topic: string
 ) => {
-  const progress = await getQuizProgress(user_id, year, subject, topic);
+  // First get quiz_id from year, subject, topic
+  const quizQuery = await pool.query(
+    `SELECT id FROM quizzes WHERE year = $1 AND subject = $2 AND topic = $3`,
+    [year, subject, topic]
+  );
+
+  if (quizQuery.rows.length === 0) return false;
+
+  const quiz_id = quizQuery.rows[0].id;
+  const progress = await getQuizProgress(user_id, quiz_id);
 
   if (!progress) return false;
 
@@ -185,11 +167,12 @@ export const getSubjectQuizCompletionPercent = async (
   subject: string
 ) => {
   const result = await pool.query(
-    `SELECT 
-        COUNT(*) FILTER (WHERE passed = TRUE) AS completed,
+    `SELECT
+        COUNT(*) FILTER (WHERE sqp.passed = TRUE) AS completed,
         COUNT(*) AS total
-     FROM student_quiz_progress
-     WHERE user_id = $1 AND year = $2 AND subject = $3`,
+     FROM student_quiz_progress sqp
+     JOIN quizzes q ON sqp.quiz_id = q.id
+     WHERE sqp.user_id = $1 AND q.year = $2 AND q.subject = $3`,
     [user_id, year, subject]
   );
 

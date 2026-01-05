@@ -8,9 +8,8 @@ import pool from "../config/db";
 export interface StudentProgress {
   id?: number;
   user_id: number;
-  year: number;
-  subject: string;
-  topic: string;
+  lesson_id: number;
+  lesson_material_id?: number;
   lesson_completed?: boolean;
   lesson_completed_at?: Date | null;
   materials_viewed?: number[];
@@ -22,60 +21,39 @@ export interface StudentProgress {
    CREATE PROGRESS RECORD (LESSON ONLY)
 ------------------------------------------------------------------- */
 export const createProgress = async (progress: StudentProgress) => {
-  const { user_id, year, subject, topic, lesson_completed } = progress;
+  const { user_id, lesson_id, materials_viewed, lesson_completed } = progress;
 
   const result = await pool.query(
     `INSERT INTO student_progress
-      (user_id, year, subject, topic, lesson_completed)
-     VALUES ($1, $2, $3, $4, $5)
+      (user_id, lesson_id, materials_viewed, lesson_completed)
+     VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [user_id, year, subject, topic, lesson_completed || false]
+    [user_id, lesson_id, JSON.stringify(materials_viewed || []), lesson_completed || false]
   );
 
   return result.rows[0];
 };
 
 /* -------------------------------------------------------------------
-   INITIALIZE FULL PROGRESS FOR YEARS 1–6
+   INITIALIZE FULL PROGRESS FOR ALL LESSONS
 ------------------------------------------------------------------- */
 export const initializeProgress = async (
   user_id: number,
-  registrationYear: number,
-  totalYears = 6
+  registrationYear: number
 ) => {
-  const subjects = [
-    { name: "Quran", topics: ["Introduction", "Reading", "Memorization"] },
-    { name: "Aqidah", topics: ["Beliefs", "Pillars", "Practices"] },
-    { name: "Ibadah", topics: ["Prayer", "Fasting", "Zakat", "Hajj"] },
-    {
-      name: "Sirah",
-      topics: ["Early Life", "Prophethood", "Migration", "Battles"],
-    },
-    { name: "Adab", topics: ["Ethics", "Manners", "Social Behavior"] },
-    {
-      name: "Arabic Language",
-      topics: ["Grammar", "Vocabulary", "Conversation"],
-    },
-    { name: "Jawi and Khat", topics: ["Writing", "Calligraphy", "Scripts"] },
-    {
-      name: "Tahfiz Al-Quran",
-      topics: ["Memorization", "Recitation", "Understanding"],
-    },
-  ];
+  // Get all lessons for the student's grade level
+  const lessonsResult = await pool.query(
+    `SELECT id FROM lessons WHERE year_level = $1`,
+    [registrationYear.toString()]
+  );
 
-  // Create progress for all years (allows review mode)
-  for (let year = 1; year <= totalYears; year++) {
-    for (const subject of subjects) {
-      for (const topic of subject.topics) {
-        await createProgress({
-          user_id,
-          year,
-          subject: subject.name,
-          topic,
-          lesson_completed: false,
-        });
-      }
-    }
+  // Create progress records for each lesson
+  for (const lesson of lessonsResult.rows) {
+    await createProgress({
+      user_id,
+      lesson_id: lesson.id,
+      lesson_completed: false,
+    });
   }
 };
 
@@ -84,9 +62,11 @@ export const initializeProgress = async (
 ------------------------------------------------------------------- */
 export const getUserProgress = async (user_id: number) => {
   const result = await pool.query(
-    `SELECT * FROM student_progress
-     WHERE user_id = $1
-     ORDER BY year, subject, topic`,
+    `SELECT sp.*, l.subject, l.title, l.year_level
+     FROM student_progress sp
+     JOIN lessons l ON sp.lesson_id = l.id
+     WHERE sp.user_id = $1
+     ORDER BY l.year_level, l.subject, l.lesson_order`,
     [user_id]
   );
 
@@ -102,10 +82,12 @@ export const getProgressByYearSubject = async (
   subject: string
 ) => {
   const result = await pool.query(
-    `SELECT * FROM student_progress
-     WHERE user_id = $1 AND year = $2 AND subject = $3
-     ORDER BY topic`,
-    [user_id, year, subject]
+    `SELECT sp.*, l.title, l.year_level
+     FROM student_progress sp
+     JOIN lessons l ON sp.lesson_id = l.id
+     WHERE sp.user_id = $1 AND l.year_level = $2 AND l.subject = $3
+     ORDER BY l.lesson_order`,
+    [user_id, `Year ${year}`, subject]
   );
 
   return result.rows;
@@ -116,18 +98,16 @@ export const getProgressByYearSubject = async (
 ------------------------------------------------------------------- */
 export const completeLesson = async (
   user_id: number,
-  year: number,
-  subject: string,
-  topic: string
+  lesson_id: number
 ) => {
   const result = await pool.query(
     `UPDATE student_progress
      SET lesson_completed = TRUE,
          lesson_completed_at = NOW(),
          updated_at = NOW()
-     WHERE user_id = $1 AND year = $2 AND subject = $3 AND topic = $4
+     WHERE user_id = $1 AND lesson_id = $2
      RETURNING *`,
-    [user_id, year, subject, topic]
+    [user_id, lesson_id]
   );
 
   return result.rows[0];
@@ -141,12 +121,13 @@ export const calculateLessonCompletionPercentage = async (
   year: number
 ) => {
   const result = await pool.query(
-    `SELECT 
-        COUNT(*) FILTER (WHERE lesson_completed = TRUE) AS completed_lessons,
+    `SELECT
+        COUNT(*) FILTER (WHERE sp.lesson_completed = TRUE) AS completed_lessons,
         COUNT(*) AS total_lessons
-     FROM student_progress
-     WHERE user_id = $1 AND year = $2`,
-    [user_id, year]
+     FROM student_progress sp
+     JOIN lessons l ON sp.lesson_id = l.id
+     WHERE sp.user_id = $1 AND l.year_level = $2`,
+    [user_id, year.toString()]
   );
 
   const completed = parseInt(result.rows[0].completed_lessons);

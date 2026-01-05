@@ -10,11 +10,11 @@ export interface QuizSession {
 export interface QuestionResponse {
   id: number;
   question: string;
-  options: string[];
+  options: { id: string; text: string }[];
   hints: string[];
   correct_answers: number | number[];
   difficulty: string;
-  isWeakTopicQuestion: boolean;
+  topic: string;
   progress: {
     current: number;
     total: number;
@@ -31,7 +31,6 @@ export interface AnswerResponse {
   answeredWithinTime: boolean;
   feedback: string;
   abilityEstimate: number;
-  isWeakTopicQuestion: boolean;
   sessionProgress: {
     current: number;
     total: number;
@@ -76,7 +75,7 @@ class AdaptiveQuizService {
     return response.data;
   }
 
-  async submitAnswer(sessionId: string, questionId: number, answer: number | number[], timeSpent: number): Promise<AnswerResponse> {
+  async submitAnswer(sessionId: string, questionId: number, answer: string | string[], timeSpent: number): Promise<AnswerResponse> {
     const response = await axios.post(`${this.baseURL}/answer/${sessionId}`, {
       questionId,
       answer,

@@ -54,7 +54,7 @@ router.post("/:id/download", downloadPaper);
 
 // Protected routes - admin only
 router.post("/", protect, upload.single("file"), createPaperController);
-router.put("/:id", protect, updatePaperController);
+router.put("/:id", protect, upload.single("file"), updatePaperController);
 router.delete("/:id", protect, deletePaperController);
 router.patch("/:id/archive", protect, archivePaperController);
 

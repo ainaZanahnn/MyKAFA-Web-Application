@@ -34,6 +34,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -186,6 +187,9 @@ export default function UserManagement() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Tambah Pengguna Baharu</DialogTitle>
+                <DialogDescription>
+                  Masukkan butiran pengguna baharu untuk menambah ke dalam sistem.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -370,6 +374,9 @@ export default function UserManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Butiran Pengguna</DialogTitle>
+            <DialogDescription>
+              Lihat butiran lengkap pengguna yang dipilih.
+            </DialogDescription>
           </DialogHeader>
           {selectedUser && (
             <div className="space-y-4">
@@ -423,6 +430,9 @@ export default function UserManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Sahkan Padam</DialogTitle>
+            <DialogDescription>
+              Tindakan ini tidak boleh dibuat asal. Sila sahkan untuk meneruskan.
+            </DialogDescription>
           </DialogHeader>
           {userToDelete && (
             <p>
