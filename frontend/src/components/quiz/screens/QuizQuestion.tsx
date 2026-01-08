@@ -56,8 +56,24 @@ export function QuizQuestion({
     }
   }, [question.id, question.topic, weakTopics]);
 
+  const handleSubmit = () => {
+    if (selectedAnswer !== null && selectedAnswer !== undefined) {
+      onSubmit();
+    }
+  };
+
+  // Determine if submit button should be disabled
+  const isSubmitDisabled = () => {
+    // For multiple choice questions, require exact number of answers
+    if (question.correct_answers && Array.isArray(question.correct_answers) && question.correct_answers.length > 1) {
+      return !Array.isArray(selectedAnswer) || selectedAnswer.length !== question.correct_answers.length;
+    }
+    // For single choice questions, require exactly one answer
+    return selectedAnswer === null;
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 flex items-center justify-center p-4">
+    <div className=" bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 flex items-center justify-center p-4">
       {/* Remedial Overlay */}
       {showRemedialOverlay && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -115,6 +131,8 @@ export function QuizQuestion({
                 </div>
               </div>
 
+
+            {/* difficulty level tag */}
               <div className="flex gap-1">
                 <div className={`px-2 py-1 rounded-lg border-2 shadow-lg font-black text-xs backdrop-blur-sm ${
                   question.difficulty === 'easy'
@@ -126,11 +144,11 @@ export function QuizQuestion({
                   {question.difficulty === 'easy' ? "Mudah 🟢" : question.difficulty === 'medium' ? "Sederhana 🟡" : "Susah 🔴"}
                 </div>
                 <div className={`px-2 py-1 rounded-lg border-2 shadow-lg font-black text-xs backdrop-blur-sm ${
-                  Array.isArray(question.correct_answers)
+                  Array.isArray(question.correct_answers) && question.correct_answers.length > 1
                     ? "bg-purple-500/20 text-purple-300 border-purple-400/30"
                     : "bg-blue-500/20 text-blue-300 border-blue-400/30"
                 }`}>
-                  {Array.isArray(question.correct_answers) ? "Jawapan Berbilang 🔹" : "Jawapan Tunggal 🔸"}
+                  {Array.isArray(question.correct_answers) && question.correct_answers.length > 1 ? "Jawapan Berbilang 🔹" : "Jawapan Tunggal 🔸"}
                 </div>
               </div>
             </div>
@@ -233,8 +251,8 @@ export function QuizQuestion({
 
             {/* Submit Button */}
             <Button
-              onClick={onSubmit}
-              disabled={selectedAnswer === null}
+              onClick={handleSubmit}
+              disabled={isSubmitDisabled()}
               className="w-full bg-gradient-to-r from-green-500/20 to-emerald-500/20 hover:from-green-400/30 hover:to-emerald-400/30 text-white py-6 text-xl font-black rounded-2xl shadow-lg hover:shadow-xl transition-all hover:scale-105 border-4 border-green-400/30 backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-400"
             >
               <span className="mr-3 text-2xl">🚀</span>

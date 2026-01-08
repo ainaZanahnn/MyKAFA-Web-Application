@@ -5,7 +5,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, CheckCircle, Star, Trophy, Lock, Smile } from "lucide-react";
+import { Play, CheckCircle, Trophy, Lock, Smile } from "lucide-react";
 import { LessonViewer } from "./LessonViewer";
 import { AdaptiveQuizPlayer } from "@/components/quiz/AdaptiveQuizPlayerNew";
 import { defaultAdaptiveSettings } from "@/lib/quiz-constants";
@@ -210,6 +210,11 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
   const handleQuizComplete = (results: unknown) => {
     console.log('Quiz completed:', results);
     toast.success('Quiz completed successfully!');
+    // Don't close the modal here - let the user see the summary first
+    // The modal will be closed when they click "Selesai" in the summary
+  };
+
+  const handleQuizExit = () => {
     setShowQuiz(false);
     setSelectedQuizLesson(null);
   };
@@ -353,7 +358,6 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
                         }`}>
                           {isQuizCompleted ? <Trophy className="w-6 h-6" /> : isLessonCompleted ? '🎯' : <Lock className="w-6 h-6" />}
                         </div>
-                        {isQuizCompleted && <Star className="w-8 h-8 text-yellow-500" />}
                       </div>
 
                       <h4 className="text-xl font-bold text-gray-800 mb-2 text-center">
@@ -426,9 +430,7 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
               subject={selectedSubject!}
               topic={selectedQuizLesson.title}
               onComplete={handleQuizComplete}
-              onExit={() => {
-                setShowQuiz(false);
-              }}
+              onExit={handleQuizExit}
             />
           </div>
         </div>

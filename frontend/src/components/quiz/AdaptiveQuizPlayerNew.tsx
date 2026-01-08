@@ -162,73 +162,83 @@ export function AdaptiveQuizPlayer({
     );
   }
 
+
+
+
+  
   // Main render logic
-  switch (currentScreen) {
-    case 'info':
-      return (
-        <QuizInfo
-          subject={subject}
-          year={year}
-          stats={quizStats.stats}
-          onStartQuiz={handleStartQuiz}
-          onExit={onExit}
-        />
-      );
+  return(
+    <div className= "min-h-0">
+      {(() => {
+           switch (currentScreen) {
+              case 'info':
+                return (
+                  <QuizInfo
+                    subject={subject}
+                    year={year}
+                    stats={quizStats.stats}
+                    onStartQuiz={handleStartQuiz}
+                    onExit={onExit}
+                  />
+                );
 
-    case 'countdown':
-      return <QuizCountdown countdown={countdown} />;
+              case 'countdown':
+                return <QuizCountdown countdown={countdown} />;
 
-    case 'question':
-      if (!quizSession.currentQuestion) {
-        return (
-          <div className="flex items-center justify-center min-h-96">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-slate-600">Memuatkan soalan...</p>
-            </div>
-          </div>
-        );
-      }
+              case 'question':
+                if (!quizSession.currentQuestion) {
+                  return (
+                    <div className="flex items-center justify-center min-h-96">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-slate-600">Memuatkan soalan...</p>
+                      </div>
+                    </div>
+                  );
+                }
 
-      return (
-        <QuizQuestion
-          question={quizSession.currentQuestion}
-          selectedAnswer={selectedAnswer}
-          timeLeft={timer.timeLeft}
-          showHint={quizSession.showHint}
-          currentHint={quizSession.currentHint}
-          onAnswerSelect={(answer) => setSelectedAnswer(answer)}
-          onUseHint={quizSession.handleUseHint}
-          onSubmit={handleAnswerSubmit}
-          canShowHint={quizSession.canShowHint()}
-          weakTopics={quizSession.weakTopics}
-        />
-      );
+                return (
+                  <QuizQuestion
+                    question={quizSession.currentQuestion}
+                    selectedAnswer={selectedAnswer}
+                    timeLeft={timer.timeLeft}
+                    showHint={quizSession.showHint}
+                    currentHint={quizSession.currentHint}
+                    onAnswerSelect={(answer) => setSelectedAnswer(answer)}
+                    onUseHint={quizSession.handleUseHint}
+                    onSubmit={handleAnswerSubmit}
+                    canShowHint={quizSession.canShowHint()}
+                    weakTopics={quizSession.weakTopics}
+                  />
+                );
 
-    case 'feedback':
-      return (
-        <QuizFeedback
-          isCorrect={quizSession.lastAnswerResult?.isCorrect || false}
-          baseScore={quizSession.lastAnswerResult?.baseScore || 0}
-          timeBonus={quizSession.lastAnswerResult?.timeBonus || 0}
-          partialCredit={quizSession.lastAnswerResult?.partialCredit || 0}
-          totalPoints={quizSession.lastAnswerResult?.totalPoints || 0}
-          feedback={quizSession.lastAnswerResult?.feedback || ''}
-        />
-      );
+              case 'feedback':
+                return (
+                  <QuizFeedback
+                    isCorrect={quizSession.lastAnswerResult?.isCorrect || false}
+                    baseScore={quizSession.lastAnswerResult?.baseScore || 0}
+                    timeBonus={quizSession.lastAnswerResult?.timeBonus || 0}
+                    partialCredit={quizSession.lastAnswerResult?.partialCredit || 0}
+                    totalPoints={quizSession.lastAnswerResult?.totalPoints || 0}
+                    feedback={quizSession.lastAnswerResult?.feedback || ''}
+                  />
+                );
 
-    case 'summary':
-      return (
-        <QuizSummaryScreen
-          totalQuestions={quizSummary?.totalQuestions || 0}
-          correctAnswers={quizSummary?.correctAnswers || 0}
-          totalScore={quizSummary?.totalScore || 0}
-          onRetry={handleRetry}
-          onComplete={onExit}
-        />
-      );
+              case 'summary':
+                return (
+                  <QuizSummaryScreen
+                    totalQuestions={quizSummary?.totalQuestions || 0}
+                    correctAnswers={quizSummary?.correctAnswers || 0}
+                    totalScore={quizSummary?.totalScore || 0}
+                    onRetry={handleRetry}
+                    onComplete={onExit}
+                  />
+                );
 
-    default:
-      return null;
+              default:
+                return null;
+            } 
+        })()}
+    </div>
+    );
   }
-}

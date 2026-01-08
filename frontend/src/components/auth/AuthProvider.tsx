@@ -179,9 +179,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await authService.login({ identifier, password });
 
-      // Debug logging
-      console.log("Login response:", response);
-
       // Check if we have a user object, which indicates successful login
       if (response.user && response.token) {
         const user = response.user;

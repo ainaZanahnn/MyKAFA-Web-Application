@@ -3,10 +3,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MessageSquare, Megaphone } from "lucide-react";
+import { Megaphone } from "lucide-react";
 import announcementService from "@/services/announcementService";
-
-const PER_PAGE = 4;
 
 // Local interface for component usage
 interface AnnouncementItem {
@@ -20,7 +18,6 @@ interface AnnouncementItem {
 
 export default function Announcements() {
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const fetchAnnouncements = async () => {
@@ -48,17 +45,6 @@ export default function Announcements() {
   const latestAnnouncement = announcements
     .filter((a) => a.type === "announcement")
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-
-  // Get feedback from guardians
-  const feedbackList = announcements
-    .filter((a) => a.type === "feedback")
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-  const totalPages = Math.ceil(feedbackList.length / PER_PAGE);
-  const paginatedFeedback = feedbackList.slice(
-    (currentPage - 1) * PER_PAGE,
-    currentPage * PER_PAGE
-  );
 
   return (
     <div>
@@ -91,71 +77,7 @@ export default function Announcements() {
         </div>
       )}
 
-      {/* Feedback from Guardians */}
-      <div className="bg-card rounded-lg p-4 shadow-2xl">
-        <h3 className="text-md font-semibold mb-4 flex items-center gap-2">
-          <Megaphone className="w-5 h-5 text-yellow-500" />
-          Maklum Balas dari Penjaga
-        </h3>
-        {paginatedFeedback.length === 0 ? (
-          <div className="p-4 text-muted-foreground text-sm">
-            Tiada maklum balas buat masa ini.
-          </div>
-        ) : (
-          paginatedFeedback.map((feedback) => (
-            <div
-              key={feedback.id}
-              className="flex items-start gap-4 p-4 border-b last:border-b-0 bg-blue-50/100 mb-4 rounded"
-            >
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-                <MessageSquare className="w-4 h-4" />
-              </div>
-              <div className="flex-1">
-                <h4 className="font-medium text-foreground mb-1">
-                  {feedback.title}
-                </h4>
-                <p className="text-sm text-muted-foreground mb-2">
-                  {feedback.content}
-                </p>
-                <div className="text-xs text-gray-400">
-                  Oleh {feedback.author_name} • {feedback.date}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
 
-      {/* Pagination for Feedback */}
-      {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button
-            className="px-3 py-1 text-sm border rounded disabled:opacity-50"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => p - 1)}
-          >
-            Prev
-          </button>
-          {[...Array(totalPages)].map((_, i) => (
-            <button
-              key={i}
-              className={`px-3 py-1 text-sm border rounded ${
-                currentPage === i + 1 ? "bg-blue-500 text-white" : ""
-              }`}
-              onClick={() => setCurrentPage(i + 1)}
-            >
-              {i + 1}
-            </button>
-          ))}
-          <button
-            className="px-3 py-1 text-sm border rounded disabled:opacity-50"
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((p) => p + 1)}
-          >
-            Next
-          </button>
-        </div>
-      )}
     </div>
   );
 }

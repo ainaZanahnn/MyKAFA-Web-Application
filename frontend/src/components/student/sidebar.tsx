@@ -12,7 +12,6 @@ import {
   FileQuestion,
   Activity,
   FileText,
-  BarChart,
   Menu,
   X,
   Star,
@@ -46,7 +45,7 @@ export function Sidebar() {
       path: "/student/interactiveactivities",
       icon: Activity,
     },
-    { name: "Prestasi", path: "/student/reports", icon: BarChart },
+    { name: "Prestasi", path: "/student/prestasi", icon: Star },
     { name: "Profil", path: "/student/profile", icon: FileText },
   ];
 

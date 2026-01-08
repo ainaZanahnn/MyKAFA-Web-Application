@@ -20,6 +20,7 @@ import StudentDashboard from "@/pages/student/dashboard";
 import StudentAnnouncements from "@/pages/student/announcement";
 import { LearningKafa } from "@/pages/student/Kafalearning";
 import UpkkPY from "@/pages/student/upkkPastYear";
+import Prestasi from "@/pages/student/prestasi";
 //import { ActivitySelector as InteractiveActivities } from "@/pages/student/interactiveactivities";
 
 import { Layout as GuardianLayout } from "@/layout/guardian-layout";
@@ -55,6 +56,7 @@ function App() {
             <Route path="announcement" element={<StudentAnnouncements />} />
             <Route path="kafalearning" element={<LearningKafa />} />
             <Route path="upkkPastYear" element={<UpkkPY />} />
+            <Route path="prestasi" element={<Prestasi />} />
             <Route path="profile" element={<ProfileStudent />} />
           </Route>
           {/* Guardian routes */}

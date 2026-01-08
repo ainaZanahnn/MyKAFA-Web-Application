@@ -5,7 +5,7 @@ import pool from "../config/db";
 import bcrypt from "bcryptjs";
 
 export interface User {
-  id?: number; //This tells TypeScript that id might not exist before insertion — but will exist after RETURNING *.
+  id?: number;
   role: "student" | "guardian" | "admin";
   id_pengguna: string;
   full_name: string;

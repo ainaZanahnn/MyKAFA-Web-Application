@@ -27,6 +27,8 @@ export function ProfileAccount() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
+
+
   // Fetch user profile data on component mount
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -152,23 +154,7 @@ export function ProfileAccount() {
     setConfirmPassword("");
   };
 
-  const handleProfilePictureChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const newPicture = reader.result as string;
-        if (isEditing) {
-          setEditedData({ ...editedData, profilePicture: newPicture });
-        } else {
-          setUserData({ ...userData, profilePicture: newPicture });
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+
 
   if (loading) {
     return <div className="max-w-5xl mx-auto p-6">Memuatkan...</div>;
@@ -401,6 +387,8 @@ export function ProfileAccount() {
           </CardContent>
         </Card>
       </div>
+
+
 
       {/* Action Buttons */}
       <div className="flex gap-4 justify-end">

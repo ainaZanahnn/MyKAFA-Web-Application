@@ -10,6 +10,10 @@ import {
   createAnnouncement,
 } from "../models/announcementModel";
 
+interface AuthenticatedRequest extends Request {
+  user?: { id: number; role: string };
+}
+
 /**
  * GET ALL ANNOUNCEMENTS AND FEEDBACK
  */
@@ -56,7 +60,7 @@ export const getLatestAnnouncementController = async (
 /**
  * GET LATEST FEEDBACK FROM GUARDIAN
  */
-export const getGuardianFeedbacks = async (req: Request, res: Response) => {
+export const getGuardianFeedbacks = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const guardianId = req.user?.id; // or req.params.id if you pass it manually
     if (!guardianId) {
