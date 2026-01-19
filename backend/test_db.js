@@ -1,4 +1,6 @@
-const pool = require('./src/config/db');
+const db = require('./dist/config/db');
+
+const pool = db.pool || db.default || db;
 
 async function testDB() {
   try {

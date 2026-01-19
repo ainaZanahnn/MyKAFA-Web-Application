@@ -12,12 +12,19 @@ const pool = new Pool({
   database: process.env.PGDATABASE,
   user: process.env.PGUSER,
   password: process.env.PGPASSWORD,
-  // Connection settings to handle timeouts and reconnections
-  connectionTimeoutMillis: 10000, // How long to wait for connection (increased from 2000ms)
-  idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
-  max: 20, // Maximum number of clients in pool
-  allowExitOnIdle: true, // Allow pool to close when idle
+
+  //REQUIRED for Render PostgreSQL
+  ssl: {
+    rejectUnauthorized: false,
+  },
+
+  // Connection settings
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 20,
+  allowExitOnIdle: true,
 });
+
 
 // Handle pool events
 pool.on('connect', (client) => {
