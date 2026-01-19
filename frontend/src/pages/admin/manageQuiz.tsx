@@ -292,9 +292,6 @@ export default function ManageQuizPage() {
               <h2 className="text-lg font-semibold">
                 Pengurusan Kuiz
               </h2>
-              <p className="text-sm text-primary-foreground/80">
-                Urus kuiz dan kandungan
-              </p>
             </div>
           </div>
 

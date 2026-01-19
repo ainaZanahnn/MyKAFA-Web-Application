@@ -1,6 +1,7 @@
 import { Question, QuizSession, HistoricalProgress } from '../types/adaptiveQuizTypes';
-import { calculateInitialAbility, identifyWeakTopics, selectNextQuestion, updateAbilityEstimate, generatePerformanceFeedback } from '../utils/adaptiveQuizUtils';
+import { calculateInitialAbility, identifyWeakTopics, selectNextQuestion, updateAbilityEstimate, generatePerformanceFeedback, isTopicMatch } from '../utils/adaptiveQuizUtils';
 import pool from '../config/db';
+import { getMergedUserProgress } from '../models/mergedProgressModel';
 
 export class AdaptiveQuizService {
 
@@ -9,10 +10,26 @@ export class AdaptiveQuizService {
     const historicalProgress = await this.getHistoricalProgress(userId);
 
     // Fetch questions
-    const questions = await this.getQuizQuestions(year, subject, topic);
+    let questions = await this.getQuizQuestions(year, subject, topic);
+
+    // If no questions found, try to find questions for the same subject and year but any topic
+    if (questions.length === 0) {
+      console.warn(`No questions found for topic "${topic}". Trying to find questions for subject "${subject}" and year ${year}...`);
+      questions = await this.getQuizQuestionsBySubjectYear(year, subject);
+
+      if (questions.length === 0) {
+        console.warn(`No questions found for subject "${subject}" and year ${year}. Using fallback questions.`);
+        questions = this.getFallbackQuestions(topic);
+      }
+    }
+
+    // Always ensure we have at least fallback questions
+    if (questions.length === 0) {
+      questions = this.getFallbackQuestions(topic);
+    }
 
     if (questions.length === 0) {
-      throw new Error('No questions available for this quiz');
+      throw new Error(`Unable to load quiz questions. Please contact administrator.`);
     }
 
     // Calculate initial ability and identify weak topics
@@ -45,10 +62,8 @@ export class AdaptiveQuizService {
       uniqueQuestionsAnswered: 0,
       totalScore: 0,
       currentTopicScore: 0,
-      weakTopicScore: 0,
       totalQuestions: sessionData.totalQuestions!,
       currentTopicQuestions: 0,
-      weakTopicQuestions: 0,
       timeSpent: 0,
       startTime: new Date(),
       isCompleted: false,
@@ -58,8 +73,10 @@ export class AdaptiveQuizService {
       consecutiveWrongAnswers: 0,
       hintsUsed: 0,
       currentHintsUsed: 0,
+      remedialQuestions: [], // Track questions from weak topics
       questionAttempts: new Map(),
-      incorrectQuestions: []
+      incorrectQuestions: [],
+      questionScores: [] // Track individual question scores
     };
   }
 
@@ -106,7 +123,7 @@ export class AdaptiveQuizService {
     const scoreResult = this.calculateScore(question, isCorrect, timeSpent, session.currentHintsUsed, answer);
 
     // Update session state
-    this.updateSessionState(session, question, isCorrect, scoreResult.totalPoints, timeSpent);
+    this.updateSessionState(session, question, isCorrect, scoreResult, timeSpent);
 
     // Update ability estimate
     session.abilityEstimate = updateAbilityEstimate(session.abilityEstimate, question.difficulty, isCorrect);
@@ -126,6 +143,7 @@ export class AdaptiveQuizService {
       ...scoreResult,
       feedback,
       abilityEstimate: session.abilityEstimate,
+      weakTopics: session.weakTopics, // Include updated weak topics
       sessionProgress: {
         current: session.questionsAnswered,
         total: session.totalQuestions,
@@ -143,9 +161,9 @@ export class AdaptiveQuizService {
     const questionAttempts = session.questionAttempts.get(questionId) || { attempts: 0, correct: false, hintsUsed: 0 };
     const wrongAttemptsForQuestion = questionAttempts.attempts - (questionAttempts.correct ? 1 : 0);
 
-    const hintThreshold = this.getHintThreshold(session.abilityEstimate);
-    if (wrongAttemptsForQuestion < hintThreshold) {
-      throw new Error(`Hint not available yet. Required wrong attempts: ${hintThreshold}, current: ${wrongAttemptsForQuestion}`);
+    // Hints are available after any wrong answer
+    if (wrongAttemptsForQuestion < 1) {
+      throw new Error('Hint available after getting the answer wrong');
     }
 
     if (session.currentHintsUsed >= session.currentQuestion.hints.length) {
@@ -173,9 +191,9 @@ export class AdaptiveQuizService {
       ? (session.currentTopicScore / session.currentTopicQuestions) * 100
       : 0;
 
-    const weakTopicPercentage = session.weakTopicQuestions > 0
-      ? (session.weakTopicScore / session.weakTopicQuestions) * 100
-      : 0;
+    // Calculate adjusted score excluding remedial questions
+    const nonRemedialScores = session.questionScores.filter(score => !score.isRemedial);
+    const adjustedTotalScore = nonRemedialScores.reduce((sum, score) => sum + score.points, 0);
 
     // Save results to database
     try {
@@ -183,6 +201,16 @@ export class AdaptiveQuizService {
     } catch (error) {
       console.error('Error saving quiz results:', error);
     }
+
+    // Filter question scores to exclude remedial questions and remove duplicates
+    const filteredQuestionScores = session.questionScores
+      .filter(score => !score.isRemedial) // Only include non-remedial questions
+      .filter((score, index, self) => {
+        // Remove duplicates - if same question appears multiple times, show only the last attempt
+        const lastIndex = self.reduce((last, current, currentIndex) =>
+          current.questionId === score.questionId ? currentIndex : last, -1);
+        return index === lastIndex;
+      });
 
     return {
       sessionId: session.sessionId,
@@ -193,13 +221,12 @@ export class AdaptiveQuizService {
       currentTopicQuestions: session.currentTopicQuestions,
       currentTopicPercentage: Math.round(currentTopicPercentage),
       quizPassed: currentTopicPercentage >= 75,
-      weakTopicScore: session.weakTopicScore,
-      weakTopicQuestions: session.weakTopicQuestions,
-      weakTopicPercentage: Math.round(weakTopicPercentage),
-      totalScore: session.totalScore,
+      totalScore: adjustedTotalScore, // Use adjusted score excluding remedial questions
       timeSpent: session.timeSpent,
       abilityEstimate: session.abilityEstimate,
-      weakTopics: session.weakTopics
+      weakTopics: session.weakTopics,
+      questionScores: filteredQuestionScores, // Return filtered question scores
+      remedialQuestionsCount: session.remedialQuestions.length
     };
   }
 
@@ -245,7 +272,7 @@ export class AdaptiveQuizService {
       partialCredit: 0.5
     };
 
-    const timeLimitSeconds = 30;
+    const timeLimitSeconds = 60;
     const answeredWithinTime = timeSpent <= timeLimitSeconds;
 
     const difficultyMultiplier = {
@@ -257,6 +284,7 @@ export class AdaptiveQuizService {
     let baseScore = 0;
     let timeBonus = 0;
     let partialCredit = 0;
+    let hintPenalty = 0;
 
     if (isCorrect) {
       baseScore = scoringRules.basePoints * difficultyMultiplier[question.difficulty];
@@ -282,12 +310,18 @@ export class AdaptiveQuizService {
       }
     }
 
-    const totalPoints = baseScore + timeBonus;
+    // Apply hint penalty if hints were used for this question
+    if (hintsUsed > 0) {
+      hintPenalty = hintsUsed * scoringRules.hintPenalty;
+    }
+
+    const totalPoints = baseScore + timeBonus - hintPenalty;
 
     return {
       baseScore,
       timeBonus,
       partialCredit,
+      hintPenalty,
       totalPoints,
       answeredWithinTime
     };
@@ -303,20 +337,36 @@ export class AdaptiveQuizService {
     return studentAnswer.filter(answer => correctAnswers.includes(answer)).length;
   }
 
-  private updateSessionState(session: QuizSession, question: Question, isCorrect: boolean, points: number, timeSpent: number) {
+  private updateSessionState(session: QuizSession, question: Question, isCorrect: boolean, scoreResult: any, timeSpent: number) {
     session.answeredQuestions.push(question.id);
     session.questionsAnswered++;
-    session.totalScore += points;
+    session.totalScore += scoreResult.totalPoints;
     session.timeSpent += timeSpent;
 
-    const isWeakTopicQuestion = session.weakTopics.some(weakTopic =>
-      weakTopic.includes(question.topic)
-    );
+    // Check if this is a remedial question (from weak topics)
+    const isRemedial = session.remedialQuestions.includes(question.id);
 
-    if (isWeakTopicQuestion) {
-      session.weakTopicQuestions++;
-      if (isCorrect) session.weakTopicScore++;
-    } else {
+    // Track individual question scores
+    const questionAttempts = session.questionAttempts.get(question.id) || { attempts: 0, correct: false, hintsUsed: 0 };
+    session.questionScores.push({
+      questionId: question.id,
+      question: question.question,
+      difficulty: question.difficulty,
+      isCorrect,
+      points: scoreResult.totalPoints,
+      timeSpent,
+      attempts: questionAttempts.attempts,
+      hintsUsed: questionAttempts.hintsUsed,
+      baseScore: scoreResult.baseScore,
+      timeBonus: scoreResult.timeBonus,
+      partialCredit: scoreResult.partialCredit,
+      hintPenalty: scoreResult.hintPenalty,
+      answeredWithinTime: scoreResult.answeredWithinTime,
+      isRemedial
+    });
+
+    // Track current topic performance - only if not remedial
+    if (!isRemedial) {
       session.currentTopicQuestions++;
       if (isCorrect) session.currentTopicScore++;
     }
@@ -332,22 +382,19 @@ export class AdaptiveQuizService {
 
   private async getHistoricalProgress(userId: number): Promise<HistoricalProgress[]> {
     try {
-      const query = `
-        SELECT year, subject, topic, topic_progress, quiz_score, quiz_passed, materials_viewed, total_materials
-        FROM merged_user_progress
-        WHERE user_id = $1
-        ORDER BY year DESC, subject, topic
-      `;
-      const result = await pool.query(query, [userId]);
-      return result.rows.map(row => ({
-        year: row.year,
-        subject: row.subject,
-        topic: row.topic,
-        topicProgress: row.topic_progress,
-        quizScore: row.quiz_score,
-        quizPassed: row.quiz_passed,
-        materialsViewed: row.materials_viewed,
-        totalMaterials: row.total_materials
+      // Use the existing merged progress system instead of a separate table
+      const mergedProgress = await getMergedUserProgress(userId);
+
+      // Transform the data to match HistoricalProgress interface
+      return mergedProgress.map(progress => ({
+        year: progress.year,
+        subject: progress.subject,
+        topic: progress.topic,
+        topicProgress: progress.topic_progress,
+        quizScore: progress.quiz_score,
+        quizPassed: progress.quiz_passed,
+        materialsViewed: progress.viewed_materials || 0,
+        totalMaterials: progress.total_materials || 0
       }));
     } catch (error) {
       console.error('Error fetching historical progress:', error);
@@ -358,7 +405,7 @@ export class AdaptiveQuizService {
   private async getQuizQuestions(year: number, subject: string, topic: string): Promise<Question[]> {
     try {
       const questionsQuery = `
-        SELECT qq.id, question, options, correct_answers::jsonb as correct_answers, hints, qq.topic, difficulty
+        SELECT qq.id, question, options, correct_answers, hints, qq.topic, difficulty
         FROM quiz_questions qq
         JOIN quizzes q ON qq.quiz_id = q.id
         WHERE q.year = $1 AND q.subject = $2 AND q.topic = $3
@@ -372,100 +419,114 @@ export class AdaptiveQuizService {
     }
   }
 
-  private async identifyWeakTopicsFromTable(userId: number, year: number, subject: string): Promise<string[]> {
+  private async getQuizQuestionsBySubjectYear(year: number, subject: string): Promise<Question[]> {
     try {
-      const query = `
-        SELECT topic, weakness_score
-        FROM student_weak_topics
-        WHERE user_id = $1 AND year = $2 AND subject = $3 AND weakness_score > 0.3
-        ORDER BY weakness_score DESC
-        LIMIT 3
+      const questionsQuery = `
+        SELECT qq.id, question, options, correct_answers, hints, qq.topic, difficulty
+        FROM quiz_questions qq
+        JOIN quizzes q ON qq.quiz_id = q.id
+        WHERE q.year = $1 AND q.subject = $2
+        ORDER BY qq.id
       `;
-      const result = await pool.query(query, [userId, year, subject]);
-      return result.rows.map(row => `${year}-${subject}-${row.topic}`);
+      const result = await pool.query(questionsQuery, [year, subject]);
+      return result.rows as Question[];
     } catch (error) {
-      console.error('Error identifying weak topics from table:', error);
+      console.error('Error fetching quiz questions by subject and year:', error);
       return [];
     }
   }
 
-  private async updateWeakTopicsRealtime(session: QuizSession, question: Question, isCorrect: boolean, isRepeatedQuestion: boolean = false) {
-    const topicKey = `${question.year || session.year}-${question.subject || session.subject}-${question.topic}`;
+  private getFallbackQuestions(topic: string): Question[] {
+    // Return some basic fallback questions for demonstration
+    // In a real application, these would be more comprehensive
+    return [
+      {
+        id: 9991,
+        question: `Apakah topik utama yang dibincangkan dalam "${topic}"?`,
+        options: [
+          { id: 'a', text: 'Konsep asas' },
+          { id: 'b', text: 'Aplikasi praktikal' },
+          { id: 'c', text: 'Kajian kes' },
+          { id: 'd', text: 'Semua yang disebutkan' }
+        ],
+        correct_answers: ['d'],
+        hints: ['Pertimbangkan semua aspek yang dipelajari dalam topik ini.'],
+        topic: topic,
+        difficulty: 'easy' as const,
+        year: 2025,
+        subject: 'General'
+      },
+      {
+        id: 9992,
+        question: `Mengapakah penting untuk mempelajari "${topic}"?`,
+        options: [
+          { id: 'a', text: 'Untuk lulus peperiksaan' },
+          { id: 'b', text: 'Untuk pemahaman yang lebih baik' },
+          { id: 'c', text: 'Untuk aplikasi dalam kehidupan seharian' },
+          { id: 'd', text: 'Semua sebab di atas' }
+        ],
+        correct_answers: ['d'],
+        hints: ['Pertimbangkan faedah jangka panjang dan praktikal.'],
+        topic: topic,
+        difficulty: 'medium' as const,
+        year: 2025,
+        subject: 'General'
+      }
+    ];
+  }
 
-    // Get current weakness score for this topic
-    const currentQuery = await pool.query(
-      `SELECT weakness_score FROM student_weak_topics
-       WHERE user_id = $1 AND year = $2 AND subject = $3 AND topic = $4`,
-      [session.userId, question.year || session.year, question.subject || session.subject, question.topic]
-    );
-
-    let currentScore = 0.5; // Default starting score
-    if (currentQuery.rows.length > 0) {
-      currentScore = parseFloat(currentQuery.rows[0].weakness_score);
-    }
-
-    // Calculate new weakness score based on performance
-    let newScore = currentScore;
-
-    // Apply weighted updates for repeated questions (60% less impact)
-    const repetitionWeight = isRepeatedQuestion ? 0.4 : 1.0;
-
-    if (isCorrect) {
-      // Reduce weakness score when correct (improve faster for weak topics)
-      const improvementRate = currentScore > 0.7 ? 0.05 : 0.03; // Faster improvement for very weak topics
-      const weightedImprovement = improvementRate * repetitionWeight;
-      newScore = Math.max(0.0, currentScore - weightedImprovement);
-    } else {
-      // Increase weakness score when incorrect
-      const declineRate = currentScore < 0.3 ? 0.08 : 0.05; // Faster decline for strong topics
-      const weightedDecline = declineRate * repetitionWeight;
-      newScore = Math.min(1.0, currentScore + weightedDecline);
-    }
-
-    // Determine improvement trend
-    let improvementTrend = 'stable';
-    if (newScore < currentScore) {
-      improvementTrend = 'improving';
-    } else if (newScore > currentScore) {
-      improvementTrend = 'declining';
-    }
-
-    // Update or insert weak topic record
-    await pool.query(
-      `INSERT INTO student_weak_topics
-        (user_id, year, subject, topic, weakness_score, last_updated, improvement_trend, remediation_attempts)
-       VALUES ($1, $2, $3, $4, $5, NOW(), $6, 1)
-       ON CONFLICT (user_id, year, subject, topic)
-       DO UPDATE SET
-         weakness_score = $5,
-         last_updated = NOW(),
-         improvement_trend = $6,
-         remediation_attempts = student_weak_topics.remediation_attempts + 1`,
-      [
-        session.userId,
-        question.year || session.year,
-        question.subject || session.subject,
-        question.topic,
-        newScore,
-        improvementTrend
-      ]
-    );
-
-    // If topic is no longer weak (score < 0.3), consider removing from active weak topics
-    if (newScore < 0.3) {
-      // Optionally remove from session's weak topics list for future questions
-      session.weakTopics = session.weakTopics.filter(wt => !wt.includes(question.topic));
+  private async identifyWeakTopicsFromTable(userId: number, year: number, subject: string): Promise<string[]> {
+    try {
+      // Simple approach: topics are weak if the student failed the quiz (< 75%)
+      const query = `
+        SELECT q.topic
+        FROM student_quiz_progress sqp
+        JOIN quizzes q ON sqp.quiz_id = q.id
+        WHERE sqp.user_id = $1 AND q.year = $2 AND q.subject = $3 AND sqp.passed = false
+        ORDER BY sqp.last_activity DESC
+      `;
+      const result = await pool.query(query, [userId, year, subject]);
+      return result.rows.map(row => `${year}-${subject}-${row.topic}`);
+    } catch (error) {
+      console.error('Error identifying weak topics:', error);
+      return [];
     }
   }
 
+  // Simplified: Weak topics are now determined by quiz pass/fail, not real-time scoring
+  // This method is kept for compatibility but no longer updates weakness scores during quiz
+  private async updateWeakTopicsRealtime(session: QuizSession, question: Question, isCorrect: boolean, isRepeatedQuestion: boolean = false) {
+    // No real-time updates - weak topics are determined by quiz results only
+    return;
+  }
+
   private async saveQuizResults(session: QuizSession, currentTopicPercentage: number) {
-    // Get quiz ID for the attempt logging
-    const quizQuery = await pool.query(
+    // Get quiz ID for the attempt logging - try exact match first, then flexible match
+    let quizQuery = await pool.query(
       `SELECT id FROM quizzes WHERE year = $1 AND subject = $2 AND topic = $3`,
       [session.year, session.subject, session.topic]
     );
 
+    // If exact match fails, try flexible topic matching
     if (quizQuery.rows.length === 0) {
+      console.log(`[DEBUG] Exact topic match failed for "${session.topic}", trying flexible match...`);
+      const allQuizzesQuery = await pool.query(
+        `SELECT id, topic FROM quizzes WHERE year = $1 AND subject = $2`,
+        [session.year, session.subject]
+      );
+
+      // Find quiz with flexible topic matching
+      for (const quiz of allQuizzesQuery.rows) {
+        if (isTopicMatch(quiz.topic, session.topic)) {
+          quizQuery = { rows: [{ id: quiz.id, topic: quiz.topic }] } as any;
+          console.log(`[DEBUG] Found matching quiz ID ${quiz.id} with topic "${quiz.topic}"`);
+          break;
+        }
+      }
+    }
+
+    if (quizQuery.rows.length === 0) {
+      console.error(`[ERROR] No quiz found for year=${session.year}, subject=${session.subject}, topic="${session.topic}"`);
       throw new Error('Quiz not found for attempt logging');
     }
 

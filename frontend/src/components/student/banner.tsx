@@ -11,10 +11,7 @@ export function Banner() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Selamat Datang ke MyKAFA</h1>
-            <p className="text-primary-foreground/80">
-              Platform Pembelajaran Secara Adaptif
-            </p>
+            <h1 className="text-4xl font-bold text-amber-950/80">Selamat Datang ke MyKAFA</h1>
           </div>
         </div>
       </div>

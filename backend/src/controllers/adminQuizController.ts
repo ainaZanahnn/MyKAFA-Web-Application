@@ -206,7 +206,6 @@ export const deleteQuiz = async (req: Request, res: Response) => {
   try {
     // Delete related records first (due to foreign key constraints)
     await pool.query('DELETE FROM student_quiz_progress WHERE quiz_id = $1', [id]);
-    await pool.query('DELETE FROM student_weak_topics WHERE quiz_id = $1', [id]);
     await pool.query('DELETE FROM quiz_questions WHERE quiz_id = $1', [id]);
 
     // Delete quiz

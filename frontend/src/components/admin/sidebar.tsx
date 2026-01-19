@@ -11,9 +11,9 @@ import {
   BookOpen,
   FileQuestion,
   HelpCircle,
-  Activity,
+  /*Activity,*/
   User,
-  FileText,
+  /*FileText*/
   Menu,
   X,
 } from "lucide-react";
@@ -34,9 +34,9 @@ export function Sidebar() {
     { name: "Modul Pembelajaran", path: "/admin/kafamodule", icon: BookOpen },
     { name: "Kertas Soalan", path: "/admin/upkk", icon: FileQuestion },
     { name: "Kuiz", path: "/admin/manageQuiz", icon: HelpCircle },
-    { name: "Aktiviti", path: "/admin/aktivities", icon: Activity },
+    /* name: "Aktiviti", path: "/admin/aktivities", icon: Activity },*/
     { name: "Pengguna", path: "/admin/user", icon: User },
-    { name: "Laporan", path: "/admin/reports", icon: FileText },
+    /*{ name: "Laporan", path: "/admin/reports", icon: FileText },*/
   ];
 
   return (

@@ -21,10 +21,10 @@ const PaperFilters: React.FC<PaperFiltersProps> = ({
   onTypeChange,
   onPageReset,
 }) => {
-  // Generate year options from 2024 down to 1997
+  // Generate year options from 2026 down to 1997
   const yearOptions = [
     "semua",
-    ...Array.from({ length: 2024 - 1997 + 1 }, (_, i) => (2024 - i).toString()),
+    ...Array.from({ length: 2026 - 1997 + 1 }, (_, i) => (2026 - i).toString()),
   ];
 
   const subjectOptions = [

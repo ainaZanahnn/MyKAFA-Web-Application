@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import upkkService from "@/services/upkkService";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, MoreHorizontal } from "lucide-react";
 
 type Paper = {
   id: number;
@@ -36,10 +36,11 @@ export default function ManagePapers() {
     subject: "",
     type: "",
     file: null as File | null,
-    status: "Active",
+    status: "Aktif",
   });
 
   const [editingPaper, setEditingPaper] = useState<Paper | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
   // Fetch papers on component mount
   useEffect(() => {
@@ -54,7 +55,7 @@ export default function ManagePapers() {
         setPapers((response.data || []).map(paper => ({
           ...paper,
           type: paper.type || '',
-          status: paper.status || 'Active',
+          status: paper.status || 'Aktif',
           downloads: paper.downloads || 0,
         })));
       }
@@ -99,7 +100,7 @@ export default function ManagePapers() {
         const paperData = {
           ...response.data,
           type: response.data.type || '',
-          status: response.data.status || 'Active',
+          status: response.data.status || 'Aktif',
           downloads: response.data.downloads || 0,
         };
         if (editingPaper) {
@@ -114,7 +115,7 @@ export default function ManagePapers() {
           subject: "",
           type: "",
           file: null,
-          status: "Active",
+          status: "Aktif",
         });
         setEditingPaper(null);
         setShowModal(false);
@@ -148,12 +149,28 @@ export default function ManagePapers() {
       const response = await upkkService.archivePaper(id);
 
       if (response.success) {
-        setPapers(papers.map((p) => p.id === id ? { ...p, status: "Archived" } : p));
+        setPapers(papers.map((p) => p.id === id ? { ...p, status: "Arkib" } : p));
         alert("Kertas soalan berjaya diarkib!");
       }
     } catch (err: unknown) {
       console.error("Archive error:", err);
       alert("Gagal mengarkib kertas soalan");
+    }
+  };
+
+  const handleActivate = async (id: number) => {
+    try {
+      const formData = new FormData();
+      formData.append("status", "Aktif");
+      const response = await upkkService.updatePaper(id, formData);
+
+      if (response.success) {
+        setPapers(papers.map((p) => p.id === id ? { ...p, status: "Aktif" } : p));
+        alert("Kertas soalan berjaya diaktifkan!");
+      }
+    } catch (err: unknown) {
+      console.error("Activate error:", err);
+      alert("Gagal mengaktifkan kertas soalan");
     }
   };
 
@@ -216,8 +233,8 @@ export default function ManagePapers() {
                 }
               >
                 <option value="">Pilih Tahun</option>
-                {Array.from({ length: 2024 - 1997 + 1 }, (_, i) =>
-                  (2024 - i).toString()
+                {Array.from({ length: 2026 - 1997 + 1 }, (_, i) =>
+                  (2026 - i).toString()
                 ).map((year) => (
                   <option key={year} value={year}>
                     {year}
@@ -375,25 +392,56 @@ export default function ManagePapers() {
                   <td className="border p-2">{paper.file_path || "N/A"}</td>
                   <td className="border p-2">{paper.status}</td>
                   <td className="border p-2">{paper.downloads}</td>
-                  <td className="border p-2 space-x-2">
+                  <td className="border p-2 relative">
                     <button
-                      onClick={() => handleEdit(paper)}
-                      className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                      onClick={() => setOpenMenuId(openMenuId === paper.id ? null : paper.id)}
+                      className="p-1 hover:bg-gray-200 rounded"
                     >
-                      Sunting
+                      <MoreHorizontal className="w-4 h-4" />
                     </button>
-                    <button
-                      onClick={() => handleDelete(paper.id)}
-                      className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                    >
-                      Padam
-                    </button>
-                    <button
-                      onClick={() => handleArchive(paper.id)}
-                      className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
-                    >
-                      Arkib
-                    </button>
+                    {openMenuId === paper.id && (
+                      <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded shadow-lg z-10">
+                        <button
+                          onClick={() => {
+                            handleEdit(paper);
+                            setOpenMenuId(null);
+                          }}
+                          className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                        >
+                          Sunting
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleDelete(paper.id);
+                            setOpenMenuId(null);
+                          }}
+                          className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100 text-red-600"
+                        >
+                          Padam
+                        </button>
+                        {paper.status === "Arkib" ? (
+                          <button
+                            onClick={() => {
+                              handleActivate(paper.id);
+                              setOpenMenuId(null);
+                            }}
+                            className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100 text-green-600"
+                          >
+                            Aktifkan
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              handleArchive(paper.id);
+                              setOpenMenuId(null);
+                            }}
+                            className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100 text-gray-600"
+                          >
+                            Arkib
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

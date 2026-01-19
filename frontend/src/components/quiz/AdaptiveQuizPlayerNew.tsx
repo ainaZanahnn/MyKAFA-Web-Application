@@ -102,24 +102,29 @@ export function AdaptiveQuizPlayer({
 
       if (result) {
         setCurrentScreen('feedback');
-
-        // Auto-advance to next question after 2 seconds
-        setTimeout(async () => {
-          setCurrentScreen('question');
-          setSelectedAnswer(null);
-
-          const nextQuestion = await quizSession.loadNextQuestion(quizSession.sessionId!);
-          if (nextQuestion && 'completed' in nextQuestion && nextQuestion.completed) {
-            await handleQuizComplete();
-          } else {
-            timer.resetTimer();
-            timer.startTimer();
-            setQuestionStartTime(Date.now());
-          }
-        }, 2000);
       }
     } catch (error) {
       console.error('Failed to submit answer:', error);
+    }
+  };
+
+  /**
+   * Handle feedback close - advance to next question or complete quiz
+   */
+  const handleFeedbackClose = async () => {
+    try {
+      setSelectedAnswer(null);
+      const nextQuestion = await quizSession.loadNextQuestion(quizSession.sessionId!);
+      if (nextQuestion && 'completed' in nextQuestion && nextQuestion.completed) {
+        await handleQuizComplete();
+      } else {
+        setCurrentScreen('question');
+        timer.resetTimer();
+        timer.startTimer();
+        setQuestionStartTime(Date.now());
+      }
+    } catch (error) {
+      console.error('Failed to load next question:', error);
     }
   };
 
@@ -133,6 +138,10 @@ export function AdaptiveQuizPlayer({
       const summary = await QuizFlowService.completeQuiz(quizSession.sessionId);
       setQuizSummary(summary);
       setCurrentScreen('summary');
+
+      // Refresh quiz stats to show updated progress
+      quizStats.refreshStats();
+
       onComplete(summary);
     } catch (error) {
       console.error('Failed to complete quiz:', error);
@@ -148,6 +157,10 @@ export function AdaptiveQuizPlayer({
     timer.resetTimer();
     setSelectedAnswer(null);
     setQuizSummary(null);
+    // Refresh stats when returning to info screen with a small delay to ensure backend updates are complete
+    setTimeout(() => {
+      quizStats.refreshStats();
+    }, 500);
   };
 
   // Loading state
@@ -219,8 +232,10 @@ export function AdaptiveQuizPlayer({
                     baseScore={quizSession.lastAnswerResult?.baseScore || 0}
                     timeBonus={quizSession.lastAnswerResult?.timeBonus || 0}
                     partialCredit={quizSession.lastAnswerResult?.partialCredit || 0}
+                    hintPenalty={quizSession.lastAnswerResult?.hintPenalty || 0}
                     totalPoints={quizSession.lastAnswerResult?.totalPoints || 0}
                     feedback={quizSession.lastAnswerResult?.feedback || ''}
+                    onClose={handleFeedbackClose}
                   />
                 );
 
@@ -230,6 +245,8 @@ export function AdaptiveQuizPlayer({
                     totalQuestions={quizSummary?.totalQuestions || 0}
                     correctAnswers={quizSummary?.correctAnswers || 0}
                     totalScore={quizSummary?.totalScore || 0}
+                    questionScores={quizSummary?.questionScores}
+                    abilityEstimate={quizSummary?.abilityEstimate}
                     onRetry={handleRetry}
                     onComplete={onExit}
                   />

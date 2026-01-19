@@ -7,7 +7,7 @@ import axios from "@/lib/axios";
 import { toast } from "react-toastify";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Camera, Edit2 } from "lucide-react";
+import { Edit2 } from "lucide-react";
 
 export function ProfileStudent() {
   const [userData, setUserData] = useState({
@@ -21,9 +21,6 @@ export function ProfileStudent() {
     schoolName: "",
     phoneNumber: "",
     password: "************",
-    class: "Kelas 1A/2025",
-    achievements: 3,
-    totalAchievements: 600,
     profilePicture: "",
   });
   const [loading, setLoading] = useState(true);
@@ -58,9 +55,6 @@ export function ProfileStudent() {
             schoolName: user.nama_sekolah || "",
             phoneNumber: user.telefon || "",
             password: "************",
-            class: "Kelas 1A/2025",
-            achievements: 3,
-            totalAchievements: 600,
             profilePicture: user.profile_picture
               ? `/${user.profile_picture}`
               : "",
@@ -181,44 +175,7 @@ export function ProfileStudent() {
     setConfirmPassword("");
   };
 
-  const handleProfilePictureChange = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        const formData = new FormData();
-        formData.append("profilePicture", file);
 
-        const response = await axios.put(
-          "/users/profile/picture",
-          formData,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-              "Content-Type": "multipart/form-data",
-            },
-          }
-        );
-
-        const updatedUser = response.data.data;
-        const newPictureUrl = updatedUser.profile_picture
-          ? `/${updatedUser.profile_picture}`
-          : "";
-
-        if (isEditing) {
-          setEditedData({ ...editedData, profilePicture: newPictureUrl });
-        } else {
-          setUserData({ ...userData, profilePicture: newPictureUrl });
-        }
-
-        toast.success("Gambar profil berjaya dikemaskini!");
-      } catch (error: unknown) {
-        console.error("Error uploading profile picture:", error);
-        toast.error("Gagal mengemaskini gambar profil");
-      }
-    }
-  };
 
   if (loading) {
     return <div className="p-6">Memuatkan...</div>;
@@ -231,35 +188,11 @@ export function ProfileStudent() {
         <div className="flex items-center gap-4">
           <div className="relative group">
             <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg overflow-hidden">
-              {(
-                isEditing ? editedData.profilePicture : userData.profilePicture
-              ) ? (
-                <img
-                  src={
-                    (isEditing
-                      ? editedData.profilePicture
-                      : userData.profilePicture) || "/placeholder.svg"
-                  }
-                  alt="Profile"
-                  className="w-full h-full object-cover rounded-full"
-                />
-              ) : (
-                <span className="text-3xl text-white font-bold">😊</span>
-              )}
+              <span className="text-3xl text-white font-bold">😊</span>
             </div>
-            <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
-              <Camera className="h-7 w-7 text-white" />
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleProfilePictureChange}
-              />
-            </label>
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Profil Saya</h1>
-            <p className="text-sm text-gray-600">{userData.class}</p>
           </div>
         </div>
 
@@ -466,30 +399,6 @@ export function ProfileStudent() {
                 )}
               </div>
 
-              {/* Phone Number */}
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-gray-700">
-                  Nombor Telefon
-                </label>
-                {isEditing ? (
-                  <input
-                    type="tel"
-                    value={editedData.phoneNumber}
-                    onChange={(e) =>
-                      setEditedData({
-                        ...editedData,
-                        phoneNumber: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                ) : (
-                  <p className="text-sm text-gray-600 py-2">
-                    {userData.phoneNumber}
-                  </p>
-                )}
-              </div>
-
               {/* Password - Full width */}
               <div className="space-y-1 md:col-span-2">
                 <label className="text-sm font-semibold text-gray-700">
@@ -526,7 +435,7 @@ export function ProfileStudent() {
       {/* Fun Message */}
       <div className="text-center mb-6">
         <p className="text-lg font-semibold text-purple-600">
-          Teruskan belajar dan dapatkan lebih banyak pencapaian
+          Usaha berterusan menjamin kecemerlangan
         </p>
       </div>
     </div>

@@ -86,7 +86,7 @@ export const createQuiz = async (req: Request, res: Response) => {
           quizId,
           question.questionText,
           JSON.stringify(question.options),
-          question.correctAnswers,
+          JSON.stringify(question.correctAnswers),
           question.hints ? JSON.stringify(question.hints) : null,
           question.difficulty || 'medium',
           topic
@@ -224,7 +224,7 @@ export const updateQuiz = async (req: Request, res: Response) => {
             id,
             question.questionText,
             JSON.stringify(question.options),
-            question.correctAnswers,
+            JSON.stringify(question.correctAnswers),
             question.hints ? JSON.stringify(question.hints) : null,
             question.difficulty || 'medium',
             topic

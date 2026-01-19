@@ -2,16 +2,14 @@
 
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Users,
   BookOpen,
   HelpCircle,
-  FileQuestion,
-  Megaphone,
-  Activity,
   UserCheck,
-  Shield,
+  Trophy,
 } from "lucide-react";
 import {
   PieChart,
@@ -24,38 +22,40 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-
-const pieData = [
-  { name: "Pelajar", value: 850, color: "hsl(var(--chart-1))" },
-  { name: "Penjaga", value: 395, color: "hsl(var(--chart-2))" },
-];
-
-const dailyUserData = [
-  { name: "Mon", users: 245 },
-  { name: "Tue", users: 312 },
-  { name: "Wed", users: 189 },
-  { name: "Thu", users: 278 },
-  { name: "Fri", users: 356 },
-  { name: "Sat", users: 198 },
-  { name: "Sun", users: 167 },
-];
-
-const newArrivals = [
-  { id: 1, title: "Kertas UPKK Baru Ditambah", subtitle: "Modul Matematik" },
-  {
-    id: 2,
-    title: "Keputusan Kuiz Tersedia",
-    subtitle: "Kuiz Interaktif Sains",
-  },
-  { id: 3, title: "Pendaftaran Pengguna", subtitle: "5 Pelajar Baru Hari Ini" },
-  {
-    id: 4,
-    title: "Modul Dikemaskini",
-    subtitle: "Modul Pembelajaran Bahasa Inggeris",
-  },
-];
+import adminDashboardService, { type AdminDashboardData } from "@/services/adminDashboardService";
 
 export default function Dashboard() {
+  const [dashboardData, setDashboardData] = useState<AdminDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await adminDashboardService.getDashboardData();
+        setDashboardData(data);
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading || !dashboardData) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Memuatkan data...</div>
+      </div>
+    );
+  }
+
+  const pieData = [
+    { name: "Pelajar Aktif", value: dashboardData.activeStudents, color: "hsl(var(--chart-1))" },
+    { name: "Pelajar Tidak Aktif", value: dashboardData.totalStudents - dashboardData.activeStudents, color: "hsl(var(--chart-2))" },
+  ];
+
   return (
     <>
       {/* Top Cards */}
@@ -63,8 +63,8 @@ export default function Dashboard() {
         <Card>
           <CardContent className="p-6 flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Jumlah Pengguna</p>
-              <p className="text-2xl font-bold">1,245</p>
+              <p className="text-sm text-muted-foreground">Jumlah Pelajar</p>
+              <p className="text-2xl font-bold">{dashboardData.totalStudents}</p>
             </div>
             <Users className="w-8 h-8 text-chart-1" />
           </CardContent>
@@ -74,9 +74,9 @@ export default function Dashboard() {
           <CardContent className="p-6 flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">
-                Modul Pembelajaran
+                Jumlah Kuiz Dijawab
               </p>
-              <p className="text-2xl font-bold">28</p>
+              <p className="text-2xl font-bold">{dashboardData.totalQuizzes}</p>
             </div>
             <BookOpen className="w-8 h-8 text-chart-2" />
           </CardContent>
@@ -85,53 +85,8 @@ export default function Dashboard() {
         <Card>
           <CardContent className="p-6 flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Kuiz Aktif</p>
-              <p className="text-2xl font-bold">15</p>
-            </div>
-            <HelpCircle className="w-8 h-8 text-chart-3" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6 flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Kertas UPKK</p>
-              <p className="text-2xl font-bold">12</p>
-            </div>
-            <FileQuestion className="w-8 h-8 text-chart-4" />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Middle Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
-        <Card>
-          <CardContent className="p-6 flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Pengumuman</p>
-              <p className="text-2xl font-bold">8</p>
-            </div>
-            <Megaphone className="w-8 h-8 text-chart-1" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6 flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Aktiviti Interaktif
-              </p>
-              <p className="text-2xl font-bold">22</p>
-            </div>
-            <Activity className="w-8 h-8 text-chart-2" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6 flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Pelajar</p>
-              <p className="text-2xl font-bold">850</p>
+              <p className="text-sm text-muted-foreground">Pelajar Aktif Hari Ini</p>
+              <p className="text-2xl font-bold">{dashboardData.activeStudents}</p>
             </div>
             <UserCheck className="w-8 h-8 text-chart-3" />
           </CardContent>
@@ -140,21 +95,21 @@ export default function Dashboard() {
         <Card>
           <CardContent className="p-6 flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Penjaga</p>
-              <p className="text-2xl font-bold">395</p>
+              <p className="text-sm text-muted-foreground">Pelajar Perlu Perhatian</p>
+              <p className="text-2xl font-bold">{dashboardData.studentsNeedingAttention}</p>
             </div>
-            <Shield className="w-8 h-8 text-chart-4" />
+            <HelpCircle className="w-8 h-8 text-chart-4" />
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts + Updates */}
+      {/* Charts + Top Performers */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Charts */}
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Taburan Jenis Pengguna</CardTitle>
+              <CardTitle>Status Aktiviti Pelajar</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-8">
@@ -179,11 +134,11 @@ export default function Dashboard() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-chart-1"></div>
-                    <span className="text-sm">Pelajar (850)</span>
+                    <span className="text-sm">Pelajar Aktif ({dashboardData.activeStudents})</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-chart-2"></div>
-                    <span className="text-sm">Penjaga (395)</span>
+                    <span className="text-sm">Pelajar Tidak Aktif ({dashboardData.totalStudents - dashboardData.activeStudents})</span>
                   </div>
                 </div>
                 <div className="ml-auto">
@@ -191,7 +146,7 @@ export default function Dashboard() {
                     <div className="text-lg font-semibold text-muted-foreground">
                       Jumlah
                     </div>
-                    <div className="text-3xl font-bold">1,245</div>
+                    <div className="text-3xl font-bold">{dashboardData.totalStudents}</div>
                   </div>
                 </div>
               </div>
@@ -205,7 +160,7 @@ export default function Dashboard() {
             <CardContent>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dailyUserData}>
+                  <BarChart data={dashboardData.dailyUserData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
@@ -217,29 +172,35 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Updates */}
+        {/* Top Performers */}
         <div>
           <Card>
             <CardHeader className="bg-primary text-primary-foreground">
-              <CardTitle>Kemaskini Terkini</CardTitle>
+              <CardTitle>Pelajar Terbaik</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              {newArrivals.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-3 p-4 border-b last:border-b-0"
-                >
-                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">
-                    {item.id}
+              {dashboardData.topPerformers.length > 0 ? (
+                dashboardData.topPerformers.map((student, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-3 p-4 border-b last:border-b-0"
+                  >
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">
+                      <Trophy className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">{student.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Purata: {student.avgScore}% ({student.quizzesTaken} kuiz)
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium">{item.title}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {item.subtitle}
-                    </p>
-                  </div>
+                ))
+              ) : (
+                <div className="p-4 text-center text-muted-foreground">
+                  Tiada data pelajar terbaik
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
         </div>

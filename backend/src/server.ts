@@ -1,20 +1,17 @@
-/** @format */
-//entry points of the backend( start Express server)
-
-import express, { Request, Response } from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import path from "path";
-import pool from "./config/db";
-import cookieParser from "cookie-parser";
-import authRoutes from "./routes/authRoutes";
-import announcementRoutes from "./routes/announcementRoutes";
-import upkkRoutes from "./routes/upkkRoutes";
-import userRoutes from "./routes/userRoutes";
-import progressRoutes from "./routes/progressRoutes";
-import lessonRoutes from "./routes/lessonRoutes";
-import quizRoutes from "./routes/quizRoutes";
-import dashboardRoutes from "./routes/dashboardRoutes";
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
+import dotenv from 'dotenv';
+import path from 'path';
+import pool from './config/db';
+import authRoutes from './routes/authRoutes';
+import announcementRoutes from './routes/announcementRoutes';
+import upkkRoutes from './routes/upkkRoutes';
+import userRoutes from './routes/userRoutes';
+import progressRoutes from './routes/progressRoutes';
+import lessonRoutes from './routes/lessonRoutes';
+import quizRoutes from './routes/quizRoutes';
+import dashboardRoutes from './routes/dashboardRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -55,7 +52,6 @@ app.use("/api/progress", progressRoutes);
 app.use("/api/lessons", lessonRoutes);
 app.use("/api", quizRoutes);
 app.use("/api/dashboard", dashboardRoutes);
-//app.use("/api", authRoutes);
 
 // Basic route for testing
 app.get("/", async (req: Request, res: Response) => {

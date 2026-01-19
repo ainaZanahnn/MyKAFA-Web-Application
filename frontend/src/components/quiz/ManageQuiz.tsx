@@ -46,7 +46,16 @@ export const ManageQuiz: React.FC<ManageQuizProps> = ({ onSave, onCancel, initia
     const fetchTopics = async () => {
       if (year && subject) {
         try {
-          const yearLevel = `Year ${year}`;
+          // Convert English year level to Malay for API call
+          const yearMap = {
+            1: 'Tahun 1',
+            2: 'Tahun 2',
+            3: 'Tahun 3',
+            4: 'Tahun 4',
+            5: 'Tahun 5',
+            6: 'Tahun 6'
+          };
+          const yearLevel = yearMap[year as keyof typeof yearMap] || `Tahun ${year}`;
           const topics = await lessonService.getTopics(subject, yearLevel);
           setAvailableTopics(topics);
         } catch (error) {

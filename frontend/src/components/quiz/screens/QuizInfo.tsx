@@ -34,14 +34,14 @@ export function QuizInfo({ subject, year, stats, onStartQuiz, onExit }: QuizInfo
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-gradient-to-br from-yellow-200 to-orange-300 p-3 rounded-xl text-center border-2 border-yellow-300 shadow-md hover:shadow-lg transition-all">
                 <div className="text-2xl mb-1">🏆</div>
-                <p className="text-xs font-bold text-yellow-800 mb-1">Skor Terbaik</p>
-                <p className="text-xl font-black text-yellow-900">{stats?.bestScore || 0}</p>
+                <p className="text-xs font-bold text-yellow-800 mb-1">Keputusan Terbaik</p>
+                <p className="text-xl font-black text-yellow-900">{stats?.bestScore || 0}%</p>
               </div>
 
               <div className="bg-gradient-to-br from-blue-200 to-cyan-300 p-3 rounded-xl text-center border-2 border-blue-300 shadow-md hover:shadow-lg transition-all">
                 <div className="text-2xl mb-1">⭐</div>
-                <p className="text-xs font-bold text-blue-800 mb-1">Skor Terakhir</p>
-                <p className="text-xl font-black text-blue-900">{stats?.lastScore || 0}</p>
+                <p className="text-xs font-bold text-blue-800 mb-1">Keputusan Terakhir</p>
+                <p className="text-xl font-black text-blue-900">{stats?.lastScore || 0}%</p>
               </div>
 
               <div className="bg-gradient-to-br from-purple-200 to-pink-300 p-3 rounded-xl text-center border-2 border-purple-300 shadow-md hover:shadow-lg transition-all">

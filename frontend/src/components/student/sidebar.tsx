@@ -8,9 +8,9 @@ import type { LucideIcon } from "lucide-react"; //type only
 import {
   Home,
   BookOpen,
-  Megaphone,
+  /*Megaphone,*/
   FileQuestion,
-  Activity,
+  /*Activity,*/
   FileText,
   Menu,
   X,
@@ -29,7 +29,7 @@ export function Sidebar() {
 
   const links: SidebarLink[] = [
     { name: "Laman Utama", path: "/student/dashboard", icon: Home },
-    { name: "Pengumuman", path: "/student/announcement", icon: Megaphone },
+    /*{ name: "Pengumuman", path: "/student/announcement", icon: Megaphone },*/
     {
       name: "Modul KAFA",
       path: "/student/Kafalearning",
@@ -40,11 +40,11 @@ export function Sidebar() {
       path: "/student/upkkPastYear",
       icon: FileQuestion,
     },
-    {
+    /*{
       name: "Aktiviti Interaktif",
       path: "/student/interactiveactivities",
       icon: Activity,
-    },
+    },*/
     { name: "Prestasi", path: "/student/prestasi", icon: Star },
     { name: "Profil", path: "/student/profile", icon: FileText },
   ];

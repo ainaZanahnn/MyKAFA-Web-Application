@@ -84,7 +84,7 @@ export default function KertasSoalanUPKK() {
 
 
 
-  const yearOptions = ["semua", ...Array.from({ length: 2024 - 1997 + 1 }, (_, i) => (2024 - i).toString())];
+  const yearOptions = ["semua", ...Array.from({ length: 2026 - 1997 + 1 }, (_, i) => (2026 - i).toString())];
   const subjectOptions = ["semua", "Aqidah", "Sirah", "Ibadah", "Al-Quran", "Jawi", "Bahasa Arab"];
   const typeOptions = ["semua", "Tahun Lepas", "Percubaan", "Skema Jawapan"];
 

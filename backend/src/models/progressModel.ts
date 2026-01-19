@@ -44,7 +44,7 @@ export const initializeProgress = async (
   // Get all lessons for the student's grade level
   const lessonsResult = await pool.query(
     `SELECT id FROM lessons WHERE year_level = $1`,
-    [registrationYear.toString()]
+    [`Year ${registrationYear}`]
   );
 
   // Create progress records for each lesson
@@ -127,7 +127,7 @@ export const calculateLessonCompletionPercentage = async (
      FROM student_progress sp
      JOIN lessons l ON sp.lesson_id = l.id
      WHERE sp.user_id = $1 AND l.year_level = $2`,
-    [user_id, year.toString()]
+    [user_id, `Year ${year}`]
   );
 
   const completed = parseInt(result.rows[0].completed_lessons);

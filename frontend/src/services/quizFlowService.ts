@@ -13,17 +13,16 @@ export class QuizFlowService {
     try {
       const results = await adaptiveQuizService.getResults(sessionId);
 
-      // Calculate correct answers from available data
-      // Use currentTopicScore if available, otherwise estimate from percentage
-      const correctAnswers = results.currentTopicScore !== undefined
-        ? Math.round(results.currentTopicScore)
-        : Math.round((results.currentTopicPercentage / 100) * results.currentTopicQuestions);
+      // Use current topic data (excluding remedial questions)
+      const correctAnswers = results.currentTopicScore || 0;
+      const totalQuestions = results.currentTopicQuestions || results.totalQuestions || 0;
 
       // Convert backend results to QuizSummary format
       const summary: QuizSummary = {
-        totalQuestions: results.totalQuestions || results.currentTopicQuestions,
+        totalQuestions: totalQuestions, // Use current topic questions count (excludes remedial)
         correctAnswers: Math.max(0, correctAnswers), // Ensure non-negative
-        totalScore: results.totalScore || results.currentTopicScore || 0,
+        totalScore: results.totalScore || 0, // This is already adjusted in backend
+        questionScores: results.questionScores || [], // Add question scores
         answers: [], // Not available from backend
         averageTime: results.questionsAnswered > 0 ? results.timeSpent / results.questionsAnswered : 0,
         timeSpent: results.timeSpent || 0,

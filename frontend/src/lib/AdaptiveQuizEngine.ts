@@ -56,6 +56,17 @@ export interface QuizSession {
   weakTopics?: string[];
 }
 
+export interface QuestionScore {
+  questionId: number;
+  question: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  isCorrect: boolean;
+  points: number;
+  timeSpent: number;
+  attempts?: number;
+  hintsUsed?: number;
+}
+
 export interface QuizSummary {
   totalQuestions: number;
   correctAnswers: number;
@@ -81,6 +92,7 @@ export interface QuizSummary {
     timeSpent: number;
     hintsUsed: number;
   }[];
+  questionScores?: QuestionScore[];
   // Backend response properties
   sessionId?: string;
   userId?: string;
@@ -89,9 +101,7 @@ export interface QuizSummary {
   currentTopicQuestions?: number;
   currentTopicPercentage?: number;
   quizPassed?: boolean;
-  weakTopicScore?: number;
-  weakTopicQuestions?: number;
-  weakTopicPercentage?: number;
+
   weakTopics?: string[];
 }
 

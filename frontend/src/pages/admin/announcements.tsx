@@ -183,7 +183,7 @@ export default function Announcements() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 >
-                  <option value="semua">Semua Pengguna</option>
+                  <option value="semua">Pengguna</option>
                   <option value="penjaga">Penjaga</option>
                   <option value="pelajar">Pelajar</option>
                 </select>
@@ -230,7 +230,7 @@ export default function Announcements() {
                 ? "Penjaga"
                 : "Pelajar"}
               {filter === "semua"
-                ? "All User"
+                ? "semua"
                 : filter === "penjaga"
                 ? "Penjaga"
                 : "Pelajar"}

@@ -27,15 +27,34 @@ export interface AnswerResponse {
   baseScore: number;
   timeBonus: number;
   partialCredit: number;
+  hintPenalty: number;
   totalPoints: number;
   answeredWithinTime: boolean;
   feedback: string;
   abilityEstimate: number;
+  weakTopics?: string[];
   sessionProgress: {
     current: number;
     total: number;
     abilityEstimate: number;
   };
+}
+
+export interface QuestionScore {
+  questionId: number;
+  question: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  isCorrect: boolean;
+  points: number;
+  timeSpent: number;
+  attempts?: number;
+  hintsUsed?: number;
+  baseScore?: number;
+  timeBonus?: number;
+  partialCredit?: number;
+  hintPenalty?: number;
+  answeredWithinTime?: boolean;
+  isRemedial?: boolean;
 }
 
 export interface QuizResults {
@@ -47,13 +66,11 @@ export interface QuizResults {
   currentTopicQuestions: number;
   currentTopicPercentage: number;
   quizPassed: boolean;
-  weakTopicScore: number;
-  weakTopicQuestions: number;
-  weakTopicPercentage: number;
   totalScore: number;
   timeSpent: number;
   abilityEstimate: number;
   weakTopics: string[];
+  questionScores?: QuestionScore[];
 }
 
 class AdaptiveQuizService {

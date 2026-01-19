@@ -6,6 +6,15 @@ import { useState, useEffect } from 'react';
 import type { QuestionResponse } from '@/lib/AdaptiveQuizService';
 import { playSelectSound } from '@/lib/sound';
 
+// Function to convert ability estimate to child-friendly skill level
+const getSkillLevel = (ability: number) => {
+  if (ability >= 0.8) return { level: 'Sangat Bijak', stars: 5, color: 'text-yellow-400' };
+  if (ability >= 0.6) return { level: 'Bijak', stars: 4, color: 'text-blue-400' };
+  if (ability >= 0.4) return { level: 'Sederhana', stars: 3, color: 'text-green-400' };
+  if (ability >= 0.2) return { level: 'Pemula', stars: 2, color: 'text-orange-400' };
+  return { level: 'Baru Belajar', stars: 1, color: 'text-red-400' };
+};
+
 interface QuizQuestionProps {
   question: QuestionResponse;
   selectedAnswer: number | number[] | null;
@@ -47,12 +56,22 @@ export function QuizQuestion({
       weakTopic.includes(question.topic)
     );
 
+    console.log('Remedial overlay check:', {
+      questionTopic: question.topic,
+      weakTopics,
+      isWeakTopicQuestion,
+      questionId: question.id
+    });
+
     if (isWeakTopicQuestion) {
+      console.log('Showing remedial overlay for question:', question.topic);
       setShowRemedialOverlay(true);
       const timer = setTimeout(() => {
         setShowRemedialOverlay(false);
       }, 4000);
       return () => clearTimeout(timer);
+    } else {
+      setShowRemedialOverlay(false);
     }
   }, [question.id, question.topic, weakTopics]);
 
@@ -126,8 +145,19 @@ export function QuizQuestion({
             <div className="flex justify-between items-center mb-3">
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 bg-purple-500 text-white px-2 py-1 rounded-lg font-black text-sm shadow-lg">
-                  <Star className="w-3 h-3" />
-                  {question.progress.abilityEstimate?.toFixed(1) ?? '0.0'}
+                  {(() => {
+                    const skillLevel = getSkillLevel(question.progress.abilityEstimate ?? 0);
+                    return (
+                      <>
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: skillLevel.stars }, (_, i) => (
+                            <Star key={i} className={`w-3 h-3 ${skillLevel.color}`} fill="currentColor" />
+                          ))}
+                        </div>
+                        <span className="text-xs ml-1">Sistem mengukur: {skillLevel.level}</span>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -141,7 +171,7 @@ export function QuizQuestion({
                     ? "bg-yellow-500/20 text-yellow-300 border-yellow-400/30"
                     : "bg-red-500/20 text-red-300 border-red-400/30"
                 }`}>
-                  {question.difficulty === 'easy' ? "Mudah 🟢" : question.difficulty === 'medium' ? "Sederhana 🟡" : "Susah 🔴"}
+                  {question.difficulty === 'easy' ? " Tahap Mudah 🟢" : question.difficulty === 'medium' ? "Tahap Sederhana 🟡" : "Tahap Susah 🔴"}
                 </div>
                 <div className={`px-2 py-1 rounded-lg border-2 shadow-lg font-black text-xs backdrop-blur-sm ${
                   Array.isArray(question.correct_answers) && question.correct_answers.length > 1

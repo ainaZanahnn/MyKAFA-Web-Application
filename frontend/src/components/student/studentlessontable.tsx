@@ -14,6 +14,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "@/components/auth/useAuth";
 import type { Lesson } from "@/services/lessonService";
 import apiClient from "@/lib/axios";
+import { emitRealTimeUpdate } from "@/hooks/useRealTimeUpdates";
 
 
 export type Quiz = {
@@ -171,6 +172,25 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
     setMaterialProgress(materialProgressData);
   };
 
+  const refreshQuizProgress = async () => {
+    if (!selectedYear || !selectedSubject || !currentUser) return;
+    const quizProgressData: { [topic: string]: { passed: boolean; score: number } } = {};
+    for (const lesson of lessons) {
+      try {
+        const quizResponse = await apiClient.get(`/quiz/progress/${currentUser.id}/${selectedYear}/${selectedSubject}/${lesson.title}`);
+        const quizData = quizResponse.data;
+        quizProgressData[lesson.title] = {
+          passed: quizData.passed || false,
+          score: quizData.last_score || 0
+        };
+      } catch (error) {
+        console.error(`Error fetching quiz progress for lesson ${lesson.title}:`, error);
+        quizProgressData[lesson.title] = { passed: false, score: 0 };
+      }
+    }
+    setQuizProgress(quizProgressData);
+  };
+
   const handleCompleteLesson = async (lessonId: number) => {
     const lesson = lessons.find(l => l.id === lessonId);
     if (!lesson || !selectedYear || !selectedSubject) return;
@@ -197,8 +217,9 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
     if (!selectedYear || !selectedSubject) return;
 
     try {
-      // For adaptive quiz, we don't need to fetch questions upfront
+      
       // The AdaptiveQuizPlayerNew will handle everything through AdaptiveQuizService
+      // Always uses adaptive quiz
       setSelectedQuizLesson(lesson);
       setShowQuiz(true);
     } catch (error: unknown) {
@@ -210,13 +231,25 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
   const handleQuizComplete = (results: unknown) => {
     console.log('Quiz completed:', results);
     toast.success('Quiz completed successfully!');
+
+    // Emit real-time update event for prestasi page
+    emitRealTimeUpdate('quiz-completed');
+
     // Don't close the modal here - let the user see the summary first
     // The modal will be closed when they click "Selesai" in the summary
   };
 
-  const handleQuizExit = () => {
+  const handleQuizExit = async () => {
     setShowQuiz(false);
     setSelectedQuizLesson(null);
+
+    // Refresh progress in parent component if available
+    if (onProgressUpdate) {
+      onProgressUpdate();
+    }
+
+    // Refresh quiz progress to show updated stats
+    await refreshQuizProgress();
   };
 
   const getMaterialIcons = (materials: Lesson['materials']) => {
@@ -420,7 +453,7 @@ export function StudentLessonTable({ lessons, selectedSubject, selectedYear, onP
         selectedYear={selectedYear}
       />
 
-      {/* Quiz Player Modal */}
+      {/* Quiz Player Modal (Always renders AdaptiveQuizPlayer) */}
       {showQuiz && selectedQuizLesson && (
         <div className="fixed inset-0 bg-gradient-to-r from-emerald-50 to-amber-50 bg-opacity-80 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">

@@ -39,10 +39,8 @@ export interface QuizSession {
   uniqueQuestionsAnswered: number;
   totalScore: number;
   currentTopicScore: number;
-  weakTopicScore: number;
   totalQuestions: number;
   currentTopicQuestions: number;
-  weakTopicQuestions: number;
   timeSpent: number;
   startTime: Date;
   isCompleted: boolean;
@@ -52,6 +50,23 @@ export interface QuizSession {
   consecutiveWrongAnswers: number;
   hintsUsed: number;
   currentHintsUsed: number;
+  remedialQuestions: number[]; // Track questions from weak topics
   questionAttempts: Map<number, { attempts: number; correct: boolean; hintsUsed: number }>;
   incorrectQuestions: number[];
+  questionScores: {
+    questionId: number;
+    question: string;
+    difficulty: 'easy' | 'medium' | 'hard';
+    isCorrect: boolean;
+    points: number;
+    timeSpent: number;
+    attempts?: number;
+    hintsUsed?: number;
+    baseScore?: number;
+    timeBonus?: number;
+    partialCredit?: number;
+    hintPenalty?: number;
+    answeredWithinTime?: boolean;
+    isRemedial?: boolean; // Mark if this is a remedial question
+  }[];
 }

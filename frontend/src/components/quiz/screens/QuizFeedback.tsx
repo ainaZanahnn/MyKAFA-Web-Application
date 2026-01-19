@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
-import { CheckCircle2, XCircle, Zap, Minus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { CheckCircle2, XCircle, Zap, Minus, X } from 'lucide-react';
 import { playCorrectSound, playLoseSound } from '@/lib/sound';
 import { useEffect } from 'react';
 
@@ -8,8 +9,10 @@ interface QuizFeedbackProps {
   baseScore: number;
   timeBonus: number;
   partialCredit: number;
+  hintPenalty: number;
   totalPoints: number;
   feedback: string;
+  onClose: () => void;
 }
 
 export function QuizFeedback({
@@ -17,8 +20,10 @@ export function QuizFeedback({
   baseScore,
   timeBonus,
   partialCredit,
+  hintPenalty,
   totalPoints,
-  feedback
+  feedback,
+  onClose
 }: QuizFeedbackProps) {
   // Play lose sound when student gets wrong answer during feedback
   useEffect(() => {
@@ -81,6 +86,16 @@ export function QuizFeedback({
               </div>
             )}
 
+            {hintPenalty > 0 && (
+              <div className="flex justify-between items-center text-red-300">
+                <span className="flex items-center gap-2">
+                  <X className="w-5 h-5" />
+                  Penalti Petunjuk
+                </span>
+                <span className="font-bold text-xl">-{hintPenalty}</span>
+              </div>
+            )}
+
             <div className="h-px bg-white/20 my-2"></div>
 
             <div className="flex justify-between items-center text-white text-xl">
@@ -89,6 +104,15 @@ export function QuizFeedback({
             </div>
           </div>
         </div>
+
+        {/* Close Button */}
+        <Button
+          onClick={onClose}
+          className="w-full mt-6 bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
+          size="lg"
+        >
+          Teruskan
+        </Button>
       </Card>
     </div>
   );

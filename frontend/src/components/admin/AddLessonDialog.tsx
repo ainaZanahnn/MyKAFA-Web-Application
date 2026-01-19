@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -81,9 +80,6 @@ export function AddLessonDialog({ isOpen, onOpenChange, selectedYear, onLessonAd
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="mb-4"><center>Tambah Pelajaran Baru</center></DialogTitle>
-          <DialogDescription>
-            Isi borang di bawah untuk menambah pelajaran baru ke dalam sistem.
-          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">

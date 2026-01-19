@@ -68,7 +68,7 @@ router.post('/adaptive-quiz/start', protect, quizRateLimit, startAdaptiveQuiz);
 router.post('/adaptive-quiz/restart', protect, quizRateLimit, restartAdaptiveQuiz);
 router.get('/adaptive-quiz/question/:sessionId', protect, quizRateLimit, getNextQuestion);
 router.post('/adaptive-quiz/answer/:sessionId', protect, answerRateLimit, submitAnswer);
-router.get('/adaptive-quiz/hint/:sessionId', protect, quizRateLimit, requestHint);
+router.post('/adaptive-quiz/hint/:sessionId', protect, quizRateLimit, requestHint);
 router.get('/adaptive-quiz/results/:sessionId', protect, quizRateLimit, getQuizResults);
 router.get('/quiz/progress/:userId/:year/:subject/:topic', protect, quizRateLimit, getQuizProgress);
 

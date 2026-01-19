@@ -193,13 +193,25 @@ export const getLessonWithMaterialsById = async (id: number) => {
    GET DISTINCT TOPICS (TITLES) BY SUBJECT AND YEAR LEVEL
 ------------------------------------------------------------------- */
 export const getTopicsBySubjectYear = async (subject: string, year_level: string) => {
+  // Convert Malay year level to English for database query
+  const yearMapReverse = {
+    'Tahun 1': 'Year 1',
+    'Tahun 2': 'Year 2',
+    'Tahun 3': 'Year 3',
+    'Tahun 4': 'Year 4',
+    'Tahun 5': 'Year 5',
+    'Tahun 6': 'Year 6'
+  };
+
+  const dbYearLevel = yearMapReverse[year_level as keyof typeof yearMapReverse] || year_level;
+
   const query = `
     SELECT DISTINCT title as topic
     FROM lessons
-    WHERE subject = $1 AND year_level = $2 AND status = 'published'
+    WHERE subject = $1 AND year_level = $2 AND status IN ('diterbitkan', 'draf')
     ORDER BY title ASC
   `;
 
-  const result = await pool.query(query, [subject, year_level]);
+  const result = await pool.query(query, [subject, dbYearLevel]);
   return result.rows.map(row => row.topic);
 };

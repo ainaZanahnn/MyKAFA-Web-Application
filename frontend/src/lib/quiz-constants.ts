@@ -2,7 +2,7 @@ import type { AdaptiveQuizSettings } from './AdaptiveQuizEngine';
 
 export const defaultAdaptiveSettings: AdaptiveQuizSettings = {
   maxQuestions: 20,
-  timeLimit: 30,
+  timeLimit: 1,
   difficultyAdjustment: 'moderate',
   enableAIFeedback: true,
   scoringRules: {

@@ -10,6 +10,7 @@ export function useQuizStats(year: number, subject: string, topic: string) {
   const [stats, setStats] = useState<QuizStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   /**
    * Load quiz statistics for the current user and topic
@@ -41,13 +42,13 @@ export function useQuizStats(year: number, subject: string, topic: string) {
    * Refresh stats (useful after quiz completion)
    */
   const refreshStats = () => {
-    loadStats();
+    setRefreshTrigger(prev => prev + 1);
   };
 
-  // Load stats on mount and when parameters change
+  // Load stats on mount, when parameters change, or when refresh is triggered
   useEffect(() => {
     loadStats();
-  }, [year, subject,topic]);
+  }, [year, subject, topic, refreshTrigger]);
 
   return {
     stats,

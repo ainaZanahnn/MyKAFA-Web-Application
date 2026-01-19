@@ -157,12 +157,17 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
         hintsUsed: existingAttempts.hintsUsed
       }));
 
-      // Update session ability estimate
+      // Update session ability estimate and weak topics
       if (session) {
         setSession({
           ...session,
           abilityEstimate: result.abilityEstimate
         });
+      }
+
+      // Update weak topics from backend response
+      if (result.weakTopics) {
+        setWeakTopics(result.weakTopics);
       }
 
       return result;
@@ -211,24 +216,22 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
 
   /**
    * Check if hints are available for current question
+   * This function determines when the hint button appears on the student interface
    */
   const canShowHint = () => {
     if (!currentQuestion || !sessionId || !session) return false;
 
-    // Check if question has hints
+    // Check if question has hints available
     if (!currentQuestion.hints || currentQuestion.hints.length === 0) return false;
 
-    // Get per-question attempts for this specific question
+    // This tracks how many times the student has tried this specific question
     const questionId = currentQuestion.id;
     const attempts = questionAttempts.get(questionId) || { attempts: 0, correct: false, hintsUsed: 0 };
     const wrongAttemptsForQuestion = attempts.attempts - (attempts.correct ? 1 : 0);
 
-    // Adaptive hint threshold based on ability estimate
-    const hintThreshold = session.abilityEstimate < 0.3 ? 2 :
-                         session.abilityEstimate < 0.6 ? 3 : 4;
-
-    // Hints are available after wrong attempts for this specific question
-    return wrongAttemptsForQuestion >= hintThreshold;
+    // Hints are available after wrong answer attempt
+    // This triggers the hint button to appear on the student interface
+    return wrongAttemptsForQuestion >= 1;
   };
 
   /**

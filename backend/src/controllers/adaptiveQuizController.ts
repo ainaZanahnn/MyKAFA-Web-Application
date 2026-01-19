@@ -27,7 +27,7 @@ export const startAdaptiveQuiz = async (req: Request, res: Response) => {
       availableQuestions: sessionData.questions
     });
 
-    sessionStore.save(session);
+    await sessionStore.save(session);
 
     res.json({
       sessionId: session.sessionId,
@@ -48,7 +48,7 @@ export const startAdaptiveQuiz = async (req: Request, res: Response) => {
 export const getNextQuestion = async (req: Request, res: Response) => {
   const { sessionId } = req.params;
 
-  const session = sessionStore.get(sessionId);
+  const session = await sessionStore.get(sessionId);
   if (!session || session.isCompleted) {
     return res.status(404).json({ error: 'Session not found or completed' });
   }
@@ -57,14 +57,14 @@ export const getNextQuestion = async (req: Request, res: Response) => {
 
   if (!nextQuestion) {
     session.isCompleted = true;
-    sessionStore.save(session);
+    await sessionStore.save(session);
     return res.json({ completed: true });
   }
 
   // Set current question and reset hint counter
   session.currentQuestion = nextQuestion;
   session.currentHintsUsed = 0;
-  sessionStore.save(session);
+  await sessionStore.save(session);
 
   res.json({
     id: nextQuestion.id,
@@ -89,14 +89,14 @@ export const submitAnswer = async (req: Request, res: Response) => {
   const { sessionId } = req.params;
   const { questionId, answer, timeSpent } = req.body;
 
-  const session = sessionStore.get(sessionId);
+  const session = await sessionStore.get(sessionId);
   if (!session || session.isCompleted) {
     return res.status(404).json({ error: 'Session not found or completed' });
   }
 
   try {
     const result = await quizService.submitAnswer(session, questionId, answer, timeSpent);
-    sessionStore.save(session);
+    await sessionStore.save(session);
 
     res.json(result);
   } catch (error: any) {
@@ -126,7 +126,7 @@ export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
       availableQuestions: sessionData.questions
     });
 
-    sessionStore.save(session);
+    await sessionStore.save(session);
 
     res.json({
       sessionId: session.sessionId,
@@ -148,14 +148,14 @@ export const restartAdaptiveQuiz = async (req: Request, res: Response) => {
 export const requestHint = async (req: Request, res: Response) => {
   const { sessionId } = req.params;
 
-  const session = sessionStore.get(sessionId);
+  const session = await sessionStore.get(sessionId);
   if (!session || session.isCompleted) {
     return res.status(404).json({ error: 'Session not found or completed' });
   }
 
   try {
     const result = await quizService.requestHint(session);
-    sessionStore.save(session);
+    await sessionStore.save(session);
 
     res.json(result);
   } catch (error: any) {
@@ -170,14 +170,14 @@ export const requestHint = async (req: Request, res: Response) => {
 export const getQuizResults = async (req: Request, res: Response) => {
   const { sessionId } = req.params;
 
-  const session = sessionStore.get(sessionId);
+  const session = await sessionStore.get(sessionId);
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
   }
 
   try {
     const results = await quizService.getQuizResults(session);
-    sessionStore.delete(sessionId); // Clean up session
+    await sessionStore.delete(sessionId); // Clean up session
 
     res.json(results);
   } catch (error: any) {
