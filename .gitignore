@@ -49,3 +49,5 @@ prisma/dev.db
 
 # Misc
 out/
+
+**/render.Dockerfile
