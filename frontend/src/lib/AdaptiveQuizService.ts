@@ -1,4 +1,4 @@
-import axios from '@/lib/axios';
+import apiClient from '@/lib/axios';
 
 export interface QuizSession {
   sessionId: string;
@@ -74,10 +74,9 @@ export interface QuizResults {
 }
 
 class AdaptiveQuizService {
-  private baseURL = '/adaptive-quiz';
 
   async startQuiz(userId: string, year: number, subject: string, topic: string, maxQuestions: number = 10): Promise<QuizSession> {
-    const response = await axios.post(`${this.baseURL}/start`, {
+    const response = await apiClient.post('/adaptive-quiz/start', {
       userId,
       year,
       subject,
@@ -88,12 +87,12 @@ class AdaptiveQuizService {
   }
 
   async getNextQuestion(sessionId: string): Promise<QuestionResponse | { completed: true }> {
-    const response = await axios.get(`${this.baseURL}/question/${sessionId}`);
+    const response = await apiClient.get(`/adaptive-quiz/question/${sessionId}`);
     return response.data;
   }
 
   async submitAnswer(sessionId: string, questionId: number, answer: string | string[], timeSpent: number): Promise<AnswerResponse> {
-    const response = await axios.post(`${this.baseURL}/answer/${sessionId}`, {
+    const response = await apiClient.post(`/adaptive-quiz/answer/${sessionId}`, {
       questionId,
       answer,
       timeSpent
@@ -102,7 +101,7 @@ class AdaptiveQuizService {
   }
 
   async getResults(sessionId: string): Promise<QuizResults> {
-    const response = await axios.get(`${this.baseURL}/results/${sessionId}`);
+    const response = await apiClient.get(`/adaptive-quiz/results/${sessionId}`);
     return response.data;
   }
 
@@ -113,7 +112,7 @@ class AdaptiveQuizService {
     totalScore: number;
     hintsRemaining: number;
   }> {
-    const response = await axios.post(`${this.baseURL}/hint/${sessionId}`);
+    const response = await apiClient.post(`/adaptive-quiz/hint/${sessionId}`);
     return response.data;
   }
 }

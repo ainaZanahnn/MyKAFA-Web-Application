@@ -1,22 +1,23 @@
-/** @format */
-
-import React, { createContext, useContext, useState } from "react";
+//** @format */
+/*
+import React, { createContext, useState } from "react";
 import type { ReactNode } from "react";
-type Language = "en" | "my" | "jawi";
 
-interface LanguageContextType {
+export type Language = "en" | "my" | "jawi";
+
+export interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
 }
 
-const LanguageContext = createContext<LanguageContextType | undefined>(
-  undefined
-);
+export const LanguageContext = React.createContext<
+  LanguageContextType | undefined
+>(undefined);
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const [language, setLanguage] = useState<Language>("my"); // Default to Malay
+  const [language, setLanguage] = useState<Language>("my");
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage }}>
@@ -24,11 +25,4 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({
     </LanguageContext.Provider>
   );
 };
-
-export const useLanguage = () => {
-  const context = useContext(LanguageContext);
-  if (!context) {
-    throw new Error("useLanguage must be used within a LanguageProvider");
-  }
-  return context;
-};
+*/

@@ -1,6 +1,5 @@
 /** @format */
 
-import React from "react";
 
 interface PaperFiltersProps {
   selectedYear: string;

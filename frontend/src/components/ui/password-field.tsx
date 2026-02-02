@@ -45,7 +45,7 @@ export function PasswordField({
     if (onRulesChange) {
       onRulesChange(failedRules.map((r) => r.message));
     }
-  }, [value]);
+  }, [failedRules, onRulesChange]);
 
   // Close popover if click outside
   useEffect(() => {

@@ -2,8 +2,7 @@
 
 "use client";
 import { useState, useEffect } from "react";
-import type React from "react";
-import axios from "@/lib/axios";
+import apiClient from "@/lib/axios";
 import { toast } from "react-toastify";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,8 +32,8 @@ export function ProfileAccount() {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const response = await axios.get(
-          "/api/users/profile",
+        const response = await apiClient.get(
+          "/users/profile",
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -115,14 +114,9 @@ export function ProfileAccount() {
         // For now, we'll skip password updates in this implementation
       }
 
-      const response = await axios.put(
-        "users/profile",
-        updates,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+      const response = await apiClient.put(
+        "/api/users/profile",
+        updates
       );
 
       const updatedUser = response.data?.data;

@@ -1,4 +1,4 @@
-import axios from '@/lib/axios';
+import apiClient from '@/lib/axios';
 
 export interface TopPerformer {
   name: string;
@@ -21,7 +21,7 @@ export interface AdminDashboardData {
 class AdminDashboardService {
   async getDashboardData(): Promise<AdminDashboardData> {
     try {
-      const response = await axios.get('/dashboard/admin');
+      const response = await apiClient.get('/dashboard/admin');
       return response.data.data;
     } catch (error) {
       console.error('Error fetching admin dashboard data:', error);

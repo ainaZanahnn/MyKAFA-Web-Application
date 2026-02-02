@@ -1,6 +1,5 @@
 /** @format */
 
-import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookOpen, Eye, Download, Heart } from "lucide-react";
 

@@ -1,6 +1,5 @@
 /** @format */
 
-import React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface PaperPaginationProps {

@@ -2,8 +2,7 @@
 
 "use client";
 import { useState, useEffect } from "react";
-import type React from "react";
-import axios from "@/lib/axios";
+import apiClient from "@/lib/axios";
 import { toast } from "react-toastify";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,7 +32,7 @@ export function ProfileStudent() {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const response = await axios.get(
+        const response = await apiClient.get(
           "/users/profile",
           {
             headers: {
@@ -135,7 +134,7 @@ export function ProfileStudent() {
         // For now, we'll skip password updates in this implementation
       }
 
-      const response = await axios.put(
+      const response = await apiClient.put(
         "/users/profile",
         updates,
         {
@@ -435,7 +434,7 @@ export function ProfileStudent() {
       {/* Fun Message */}
       <div className="text-center mb-6">
         <p className="text-lg font-semibold text-purple-600">
-          Usaha berterusan menjamin kecemerlangan
+          Usaha berterusan menjamin kecemerlangank
         </p>
       </div>
     </div>

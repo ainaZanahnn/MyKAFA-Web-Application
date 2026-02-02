@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { adaptiveQuizService, type QuestionResponse, type AnswerResponse } from '@/lib/AdaptiveQuizService';
 import type { AdaptiveQuizSettings, QuizSession } from '@/lib/AdaptiveQuizEngine';
 import { useAuth } from '@/components/auth/useAuth';
@@ -7,7 +7,12 @@ import { useAuth } from '@/components/auth/useAuth';
  * Custom hook for managing adaptive quiz session state
  * Handles session initialization, question loading, and answer submission
  */
-export function useQuizSession(settings: AdaptiveQuizSettings, year: number, subject: string, topic: string) {
+export function useQuizSession(
+  settings: AdaptiveQuizSettings,
+  year: number,
+  subject: string,
+  topic: string
+) {
   const { user } = useAuth();
 
   // Session state
@@ -27,69 +32,14 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
   const [lastAnswerResult, setLastAnswerResult] = useState<AnswerResponse | null>(null);
 
   // Track per-question attempts for hint logic
-  const [questionAttempts, setQuestionAttempts] = useState<Map<number, { attempts: number; correct: boolean; hintsUsed: number }>>(new Map());
-
-  /**
-   * Initialize quiz session when component mounts
-   */
-  useEffect(() => {
-    if (!quizStarted && user?.id) {
-      startQuiz();
-    }
-  }, [user?.id, quizStarted]);
-
-  /**
-   * Start a new quiz session
-   */
-  const startQuiz = async () => {
-    if (!user || !user.id) return;
-
-    try {
-      setIsLoading(true);
-      setQuizStarted(true);
-
-      const sessionData = await adaptiveQuizService.startQuiz(
-        user.id.toString(),
-        year,
-        subject,
-        topic,
-        settings.maxQuestions
-      );
-
-      setSessionId(sessionData.sessionId);
-      setWeakTopics(sessionData.weakTopics || []);
-
-      // Initialize frontend session state for adaptive hints
-      const initialSession: QuizSession = {
-        sessionId: sessionData.sessionId,
-        userId: user.id.toString(),
-        abilityEstimate: sessionData.initialAbility,
-        consecutiveWrongAnswers: 0,
-        currentHintsUsed: 0,
-        questionsAnswered: 0,
-        totalScore: 0,
-        timeSpent: 0,
-        isCompleted: false,
-        hintsUsed: 0,
-        totalQuestions: settings.maxQuestions,
-        questionHistory: [],
-        currentQuestion: null,
-        weakTopics: sessionData.weakTopics || []
-      };
-
-      setSession(initialSession);
-      await loadNextQuestion(sessionData.sessionId);
-    } catch (error) {
-      console.error('Failed to start quiz:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [questionAttempts, setQuestionAttempts] = useState<
+    Map<number, { attempts: number; correct: boolean; hintsUsed: number }>
+  >(new Map());
 
   /**
    * Load the next question in the session
    */
-  const loadNextQuestion = async (sid: string) => {
+  const loadNextQuestion = useCallback(async (sid: string) => {
     if (isLoadingQuestion || !sid) return;
 
     try {
@@ -99,25 +49,87 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
       const response = await adaptiveQuizService.getNextQuestion(sid);
 
       if ('completed' in response) {
-        // Quiz is completed, handle in parent component
         return { completed: true };
       }
 
       setCurrentQuestion(response);
-
-      // Reset hint state for new question
       setCurrentHint(null);
       setShowHint(false);
 
       return response;
     } catch (error) {
       console.error('Failed to load question:', error);
-      throw error; // Re-throw to allow parent component to handle
+      throw error;
     } finally {
       setIsLoading(false);
       setIsLoadingQuestion(false);
     }
-  };
+  }, [isLoadingQuestion]);
+
+  /**
+   * Start a new quiz session
+   * Function declaration avoids use-before-define ESLint error
+   */
+const startQuiz = useCallback(async () => {
+  if (!user || !user.id) return;
+
+  try {
+    setIsLoading(true);
+    setQuizStarted(true);
+
+    const sessionData = await adaptiveQuizService.startQuiz(
+      user.id.toString(),
+      year,
+      subject,
+      topic,
+      settings.maxQuestions
+    );
+
+    setSessionId(sessionData.sessionId);
+    setWeakTopics(sessionData.weakTopics || []);
+
+    const initialSession: QuizSession = {
+      sessionId: sessionData.sessionId,
+      userId: user.id.toString(),
+      abilityEstimate: sessionData.initialAbility,
+      consecutiveWrongAnswers: 0,
+      currentHintsUsed: 0,
+      questionsAnswered: 0,
+      totalScore: 0,
+      timeSpent: 0,
+      isCompleted: false,
+      hintsUsed: 0,
+      totalQuestions: settings.maxQuestions,
+      questionHistory: [],
+      currentQuestion: null,
+      weakTopics: sessionData.weakTopics || []
+    };
+
+    setSession(initialSession);
+    await loadNextQuestion(sessionData.sessionId);
+  } catch (error) {
+    console.error('Failed to start quiz:', error);
+  } finally {
+    setIsLoading(false);
+  }
+}, [
+  user,
+  year,
+  subject,
+  topic,
+  settings.maxQuestions,
+  loadNextQuestion
+]);
+
+
+  /**
+   * Initialize quiz session when component mounts
+   */
+  useEffect(() => {
+    if (!quizStarted && user?.id) {
+      startQuiz();
+    }
+  }, [user?.id, quizStarted, startQuiz]);
 
   /**
    * Submit an answer for the current question
@@ -128,15 +140,9 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
     try {
       setIsLoading(true);
 
-      // Convert answer indices to option IDs for backend compatibility
-      let backendAnswer: string | string[];
-      if (Array.isArray(answer)) {
-        // Multiple choice: convert indices to option IDs
-        backendAnswer = answer.map(index => currentQuestion.options[index]?.id || index.toString());
-      } else {
-        // Single choice: convert index to option ID
-        backendAnswer = currentQuestion.options[answer]?.id || answer.toString();
-      }
+      const backendAnswer = Array.isArray(answer)
+        ? answer.map(i => currentQuestion.options[i]?.id || i.toString())
+        : currentQuestion.options[answer]?.id || answer.toString();
 
       const result = await adaptiveQuizService.submitAnswer(
         sessionId,
@@ -147,25 +153,25 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
 
       setLastAnswerResult(result);
 
-      // Update per-question attempts for hint logic
       const questionId = currentQuestion.id;
-      const existingAttempts = questionAttempts.get(questionId) || { attempts: 0, correct: false, hintsUsed: 0 };
-      const newAttempts = existingAttempts.attempts + 1;
-      setQuestionAttempts(prev => new Map(prev).set(questionId, {
-        attempts: newAttempts,
-        correct: result.isCorrect,
-        hintsUsed: existingAttempts.hintsUsed
-      }));
+      const existing = questionAttempts.get(questionId) || {
+        attempts: 0,
+        correct: false,
+        hintsUsed: 0
+      };
 
-      // Update session ability estimate and weak topics
+      setQuestionAttempts(prev =>
+        new Map(prev).set(questionId, {
+          attempts: existing.attempts + 1,
+          correct: result.isCorrect,
+          hintsUsed: existing.hintsUsed
+        })
+      );
+
       if (session) {
-        setSession({
-          ...session,
-          abilityEstimate: result.abilityEstimate
-        });
+        setSession({ ...session, abilityEstimate: result.abilityEstimate });
       }
 
-      // Update weak topics from backend response
       if (result.weakTopics) {
         setWeakTopics(result.weakTopics);
       }
@@ -179,7 +185,7 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
   };
 
   /**
-   * Handle hint usage with adaptive logic
+   * Handle hint usage
    */
   const handleUseHint = async () => {
     if (!currentQuestion || !sessionId) return;
@@ -192,20 +198,22 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
       setCurrentHint(hintResponse.hint);
       setShowHint(true);
 
-      // Update per-question hints used
       const questionId = currentQuestion.id;
-      const existingAttempts = questionAttempts.get(questionId) || { attempts: 0, correct: false, hintsUsed: 0 };
-      setQuestionAttempts(prev => new Map(prev).set(questionId, {
-        ...existingAttempts,
-        hintsUsed: existingAttempts.hintsUsed + 1
-      }));
+      const existing = questionAttempts.get(questionId) || {
+        attempts: 0,
+        correct: false,
+        hintsUsed: 0
+      };
 
-      // Update session score after hint penalty
+      setQuestionAttempts(prev =>
+        new Map(prev).set(questionId, {
+          ...existing,
+          hintsUsed: existing.hintsUsed + 1
+        })
+      );
+
       if (session) {
-        setSession({
-          ...session,
-          totalScore: hintResponse.totalScore
-        });
+        setSession({ ...session, totalScore: hintResponse.totalScore });
       }
     } catch (error) {
       console.error('Failed to get hint:', error);
@@ -215,27 +223,23 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
   };
 
   /**
-   * Check if hints are available for current question
-   * This function determines when the hint button appears on the student interface
+   * Determine hint visibility
    */
   const canShowHint = () => {
     if (!currentQuestion || !sessionId || !session) return false;
+    if (!currentQuestion.hints?.length) return false;
 
-    // Check if question has hints available
-    if (!currentQuestion.hints || currentQuestion.hints.length === 0) return false;
+    const attempts = questionAttempts.get(currentQuestion.id) || {
+      attempts: 0,
+      correct: false,
+      hintsUsed: 0
+    };
 
-    // This tracks how many times the student has tried this specific question
-    const questionId = currentQuestion.id;
-    const attempts = questionAttempts.get(questionId) || { attempts: 0, correct: false, hintsUsed: 0 };
-    const wrongAttemptsForQuestion = attempts.attempts - (attempts.correct ? 1 : 0);
-
-    // Hints are available after wrong answer attempt
-    // This triggers the hint button to appear on the student interface
-    return wrongAttemptsForQuestion >= 1;
+    return attempts.attempts - (attempts.correct ? 1 : 0) >= 1;
   };
 
   /**
-   * Reset session state (for retry functionality)
+   * Reset session
    */
   const resetSession = () => {
     setSessionId(null);
@@ -250,7 +254,6 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
   };
 
   return {
-    // State
     sessionId,
     currentQuestion,
     session,
@@ -261,8 +264,6 @@ export function useQuizSession(settings: AdaptiveQuizSettings, year: number, sub
     currentHint,
     showHint,
     lastAnswerResult,
-
-    // Actions
     startQuiz,
     loadNextQuestion,
     submitAnswer,

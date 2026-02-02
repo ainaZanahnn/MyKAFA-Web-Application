@@ -51,9 +51,13 @@ export default function Dashboard() {
     );
   }
 
+  const activeStudents = dashboardData.activeStudents;
+  const inactiveStudents = dashboardData.totalStudents - dashboardData.activeStudents;
+
+  // Fixed colors: Green for active students, Red for inactive students
   const pieData = [
-    { name: "Pelajar Aktif", value: dashboardData.activeStudents, color: "hsl(var(--chart-1))" },
-    { name: "Pelajar Tidak Aktif", value: dashboardData.totalStudents - dashboardData.activeStudents, color: "hsl(var(--chart-2))" },
+    { name: "Pelajar Aktif", value: activeStudents, color: "hsl(142, 76%, 36%)" }, // Green
+    { name: "Pelajar Tidak Aktif", value: inactiveStudents, color: "hsl(0, 84%, 60%)" }, // Red
   ];
 
   return (

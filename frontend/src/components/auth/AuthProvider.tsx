@@ -5,10 +5,10 @@
 import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { toast } from "react-toastify"; // ✅ import toast system
-import axios from "axios";
 import { AuthContext } from "./AuthContext";
 import type { User, RegisterFormData } from "./AuthContext";
 import authService from "@/services/authService";
+import apiClient from "@/lib/axios";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Set up axios response interceptor to handle 401 and 403 errors
   useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
+    const interceptor = apiClient.interceptors.response.use(
       (response) => response,
       async (error) => {
         if (error.response?.status === 401) {
@@ -139,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               // Retry the original request with updated token (mark as retried to prevent infinite loop)
               error.config._retry = true;
               error.config.headers.Authorization = `Bearer ${token}`;
-              return axios(error.config);
+              return apiClient(error.config);
             }
           } catch {
             // Refresh failed, log out
@@ -170,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Cleanup interceptor on unmount
     return () => {
-      axios.interceptors.response.eject(interceptor);
+      apiClient.interceptors.response.eject(interceptor);
     };
   }, [user]);
 

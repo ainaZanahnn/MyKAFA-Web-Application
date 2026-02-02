@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import quizService from '@/services/quizService';
 import type { QuizStats } from '@/types/kafaTypes';
 
@@ -15,7 +15,7 @@ export function useQuizStats(year: number, subject: string, topic: string) {
   /**
    * Load quiz statistics for the current user and topic
    */
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -36,7 +36,7 @@ export function useQuizStats(year: number, subject: string, topic: string) {
     } finally {
       setIsLoading(false);
     }
-  };
+  },[year, subject, topic]);
 
   /**
    * Refresh stats (useful after quiz completion)
@@ -48,7 +48,7 @@ export function useQuizStats(year: number, subject: string, topic: string) {
   // Load stats on mount, when parameters change, or when refresh is triggered
   useEffect(() => {
     loadStats();
-  }, [year, subject, topic, refreshTrigger]);
+  }, [loadStats, refreshTrigger]);
 
   return {
     stats,

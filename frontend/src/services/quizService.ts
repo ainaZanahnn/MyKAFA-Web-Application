@@ -1,4 +1,4 @@
-import axios from '@/lib/axios';
+import apiClient from '@/lib/axios';
 import type { QuizStats } from '@/types/kafaTypes';
 import type { AdaptiveQuizSettings } from '../lib/AdaptiveQuizEngine';
 
@@ -44,22 +44,22 @@ export interface QuizData {
 
 class QuizService {
   async getQuizStats(year: number, subject: string, topic: string): Promise<QuizStats> {
-    const response = await axios.get(`/quizzes/student/stats/${year}/${subject}/${topic}`);
+    const response = await apiClient.get(`/quizzes/student/stats/${year}/${subject}/${topic}`);
     return response.data.stats;
   }
 
   async getStudentQuiz(year: number, subject: string, topic: string) {
-    const response = await axios.get(`/quizzes/student/${year}/${subject}/${topic}`);
+    const response = await apiClient.get(`/quizzes/student/${year}/${subject}/${topic}`);
     return response.data;
   }
 
   async getQuizzes() {
-    const response = await axios.get('/admin');
+    const response = await apiClient.get('/admin');
     return response.data;
   }
 
   async getQuiz(id: number) {
-    const response = await axios.get(`/admin/${id}`);
+    const response = await apiClient.get(`/admin/${id}`);
     return {
       ...response.data,
       quizType: response.data.quiz_type || 'mcq',
@@ -68,22 +68,22 @@ class QuizService {
   }
 
   async createQuiz(quizData: unknown) {
-    const response = await axios.post('/admin', quizData);
+    const response = await apiClient.post('/admin', quizData);
     return response.data;
   }
 
   async updateQuiz(id: number, quizData: unknown) {
-    const response = await axios.put(`/admin/${id}`, quizData);
+    const response = await apiClient.put(`/admin/${id}`, quizData);
     return response.data;
   }
 
   async deleteQuiz(id: number) {
-    const response = await axios.delete(`/admin/${id}`);
+    const response = await apiClient.delete(`/admin/${id}`);
     return response.data;
   }
 
   async updateQuizStatus(id: number, status: string) {
-    const response = await axios.put(`/admin/${id}/status`, { status });
+    const response = await apiClient.put(`/admin/${id}/status`, { status });
     return response.data;
   }
 

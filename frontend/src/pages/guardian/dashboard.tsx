@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect} from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,15 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/components/auth/useAuth";
 import { MessageSquare, Send, Plus } from "lucide-react";
 import announcementService from "@/services/announcementService";
+import type { Announcement } from "@/services/announcementService";
+import type { FormEvent } from "react";
 
-interface Feedback {
-  id: string;
-  title: string;
-  content: string;
-  date: string;
-  author_id: string;
-  type?: string;
-}
+type Feedback = Announcement;
 
 const GuardianDashboard = () => {
   const { user } = useAuth();
@@ -38,14 +33,19 @@ const GuardianDashboard = () => {
         const { data } = await announcementService.getAnnouncements();
         // Filter feedbacks by current guardian and sort by date descending
         console.log("Fetched feedbacks:", data); // Debug log
-        const guardianFeedbacks = data
-          .filter((feedback) => feedback.type === "feedback" && feedback.author_id === String(user?.id))
+        const guardianFeedbacks: Feedback[] = data
+          .filter(
+            (item): item is Feedback =>
+              item.type === "feedback" && item.author_id === user?.id
+          )
           .sort(
             (a, b) =>
               new Date(b.date).getTime() - new Date(a.date).getTime()
           )
-          .slice(0, 2); // Keep only 2 latest
+          .slice(0, 2);
+
         setFeedbacks(guardianFeedbacks);
+
       } catch (error) {
         console.error("Error fetching feedbacks:", error);
       }
@@ -56,7 +56,7 @@ const GuardianDashboard = () => {
     }
   }, [user?.id]);
 
-  const handleCreateFeedback = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateFeedback = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!feedbackForm.title.trim() || !feedbackForm.content.trim()) {

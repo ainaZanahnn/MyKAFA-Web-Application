@@ -2,7 +2,21 @@
 
 "use client";
 
-export function ActivityCard({ activity, onSelect }: any) {
+import type { ReactNode } from "react";
+
+interface Activity {
+  title: string;
+  description: string;
+  color: string;
+  icon: ReactNode;
+}
+
+interface ActivityCardProps {
+  activity: Activity;
+  onSelect: () => void;
+}
+
+export function ActivityCard({ activity, onSelect }: ActivityCardProps) {
   return (
     <button
       onClick={onSelect}
@@ -12,7 +26,10 @@ export function ActivityCard({ activity, onSelect }: any) {
         {activity.icon}
       </div>
 
-      <h3 className="text-2xl font-bold mb-3 text-center">{activity.title}</h3>
+      <h3 className="text-2xl font-bold mb-3 text-center">
+        {activity.title}
+      </h3>
+
       <p className="text-white text-opacity-90 font-medium text-center text-sm">
         {activity.description}
       </p>

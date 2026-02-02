@@ -136,7 +136,7 @@ export default function ManageQuizPage() {
         id: q.id || (Date.now() + Math.random() + index),
         questionText: q.questionText || '',
         options: Array.isArray(q.options) && q.options.length > 0
-          ? q.options.map((opt: unknown, index: number) =>
+          ? q.options.map((opt: unknown) =>
               typeof opt === 'string'
                 ? { id: `opt_legacy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, text: opt }
                 : opt as QuestionOption

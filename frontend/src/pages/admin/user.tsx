@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  Trophy,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -40,6 +41,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "react-toastify";
+import dashboardService, { type DashboardData } from "@/services/dashboardService";
 
 interface User {
   id: number;
@@ -67,6 +69,8 @@ export default function UserManagement() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isViewPrestasiOpen, setIsViewPrestasiOpen] = useState(false);
+  const [selectedUserPrestasi, setSelectedUserPrestasi] = useState<DashboardData | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -123,6 +127,18 @@ export default function UserManagement() {
   const handleViewUser = (user: User) => {
     setSelectedUser(user);
     setIsViewUserOpen(true);
+  };
+
+  const handleViewPrestasi = async (user: User) => {
+    try {
+      const prestasiData = await dashboardService.getStudentPrestasiById(user.id);
+      setSelectedUser(user);
+      setSelectedUserPrestasi(prestasiData);
+      setIsViewPrestasiOpen(true);
+    } catch (error) {
+      console.error("Error fetching student prestasi:", error);
+      toast.error("Gagal mendapatkan data prestasi pelajar");
+    }
   };
 
   const handleSuspendUser = async (user: User) => {
@@ -292,6 +308,11 @@ export default function UserManagement() {
                       <DropdownMenuItem onClick={() => handleViewUser(user)}>
                         <Eye className="w-4 h-4 mr-2" /> Lihat
                       </DropdownMenuItem>
+                      {user.role === "student" && (
+                        <DropdownMenuItem onClick={() => handleViewPrestasi(user)}>
+                          <Trophy className="w-4 h-4 mr-2" /> Lihat Prestasi
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => handleSuspendUser(user)}>
                         {user.status === "active" ? (
                           <>
@@ -419,6 +440,201 @@ export default function UserManagement() {
                     <strong>Phone:</strong> {selectedUser.telefon}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* View Prestasi Dialog */}
+      <Dialog open={isViewPrestasiOpen} onOpenChange={setIsViewPrestasiOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Prestasi Pelajar</DialogTitle>
+            <DialogDescription>
+              Lihat prestasi pembelajaran pelajar yang dipilih.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedUser && selectedUserPrestasi && (
+            <div className="space-y-6">
+              {/* Student Info */}
+              <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                <img
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedUser.id}`}
+                  className="w-16 h-16 rounded-full"
+                />
+                <div>
+                  <h3 className="text-lg font-semibold">{selectedUser.full_name}</h3>
+                  <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                  <p className="text-sm">ID: {selectedUser.id_pengguna}</p>
+                </div>
+              </div>
+
+              {/* Summary Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg border">
+                  <h4 className="font-semibold text-blue-800">Tahun Semasa</h4>
+                  <p className="text-2xl font-bold text-blue-600">{selectedUserPrestasi.currentLevel}</p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg border">
+                  <h4 className="font-semibold text-green-800">Jumlah Mata Kuiz</h4>
+                  <p className="text-2xl font-bold text-green-600">{selectedUserPrestasi.quizPoints}</p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg border">
+                  <h4 className="font-semibold text-purple-800">Purata Kemahiran</h4>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {(selectedUserPrestasi.currentAbility * 100).toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+
+              {/* Subject Abilities */}
+              {selectedUserPrestasi.subjectYearAbilities.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-3">Penilaian Kemahiran Mengikut Mata Pelajaran</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedUserPrestasi.subjectYearAbilities.map((subject, index) => (
+                      <div key={index} className="bg-gray-50 p-4 rounded-lg border">
+                        <div className="flex justify-between items-start mb-2">
+                          <h5 className="font-medium">{subject.subject}</h5>
+                          <span className="text-sm text-muted-foreground">Tahun {subject.year}</span>
+                        </div>
+                        <p className="text-sm">Kemahiran: {(subject.ability * 100).toFixed(1)}%</p>
+                        <p className="text-sm">Percubaan: {subject.attempts}</p>
+                        <p className="text-sm">Terbaik: {(subject.maxAbility * 100).toFixed(1)}%</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Weak Areas */}
+              {selectedUserPrestasi.weakAreas.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-3">Topik Yang Perlu Diperbaiki</h4>
+                  <div className="space-y-3">
+                    {selectedUserPrestasi.weakAreas.map((area, index) => (
+                      <div key={index} className="bg-red-50 p-4 rounded-lg border border-red-200">
+                        <h5 className="font-medium text-red-800">{area.subject} - {area.topic}</h5>
+                        <p className="text-sm text-red-700 mt-1">{area.issue}</p>
+                        <p className="text-sm text-red-600 mt-1">{area.recommendation}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Quiz History */}
+              {selectedUserPrestasi.quizHistory && selectedUserPrestasi.quizHistory.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-3">Sejarah Kuiz (20 Terakhir)</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border-collapse border border-gray-300">
+                      <thead>
+                        <tr className="bg-gray-100">
+                          <th className="border border-gray-300 p-2">Mata Pelajaran</th>
+                          <th className="border border-gray-300 p-2">Topik</th>
+                          <th className="border border-gray-300 p-2">Tahun</th>
+                          <th className="border border-gray-300 p-2">Skor Terakhir</th>
+                          <th className="border border-gray-300 p-2">Skor Terbaik</th>
+                          <th className="border border-gray-300 p-2">Percubaan</th>
+                          <th className="border border-gray-300 p-2">Status</th>
+                          <th className="border border-gray-300 p-2">Tarikh</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedUserPrestasi.quizHistory.map((quiz, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="border border-gray-300 p-2">{quiz.subject}</td>
+                            <td className="border border-gray-300 p-2">{quiz.topic}</td>
+                            <td className="border border-gray-300 p-2">{quiz.year}</td>
+                            <td className="border border-gray-300 p-2">{quiz.lastScore}%</td>
+                            <td className="border border-gray-300 p-2">{quiz.bestScore}%</td>
+                            <td className="border border-gray-300 p-2">{quiz.totalAttempts}</td>
+                            <td className="border border-gray-300 p-2">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                quiz.passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                              }`}>
+                                {quiz.passed ? 'Lulus' : 'Gagal'}
+                              </span>
+                            </td>
+                            <td className="border border-gray-300 p-2">
+                              {new Date(quiz.lastActivity).toLocaleDateString('ms-MY')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Ability Progression */}
+              {selectedUserPrestasi.abilityProgression && selectedUserPrestasi.abilityProgression.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-3">Kemajuan Kemahiran (30 Hari Terakhir)</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="space-y-2">
+                      {selectedUserPrestasi.abilityProgression.map((progress, index) => (
+                        <div key={index} className="flex items-center justify-between">
+                          <span className="text-sm font-medium">
+                            {new Date(progress.date).toLocaleDateString('ms-MY')}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-32 bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-blue-600 h-2 rounded-full"
+                                style={{ width: `${Math.min(progress.avgAbility * 100, 100)}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-sm font-medium">
+                              {(progress.avgAbility * 100).toFixed(1)}%
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              ({progress.attempts} percubaan)
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Lesson History */}
+              {selectedUserPrestasi.lessonHistory && selectedUserPrestasi.lessonHistory.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-3">Sejarah Pelajaran Selesai (10 Terakhir)</h4>
+                  <div className="space-y-2">
+                    {selectedUserPrestasi.lessonHistory.map((lesson, index) => (
+                      <div key={index} className="flex items-center justify-between bg-green-50 p-3 rounded-lg border border-green-200">
+                        <div>
+                          <span className="font-medium">{lesson.subject}</span>
+                          <span className="text-gray-600 ml-2">- {lesson.topic}</span>
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {new Date(lesson.completedAt).toLocaleDateString('ms-MY')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Additional Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <strong>Pelajaran Selesai:</strong> {selectedUserPrestasi.lessonsCompleted}
+                </div>
+                <div>
+                  <strong>Kuiz Lulus:</strong> {selectedUserPrestasi.quizzesPassed}
+                </div>
+                <div>
+                  <strong>Jumlah Percubaan:</strong> {selectedUserPrestasi.totalQuizAttempts}
+                </div>
+                <div>
+                  <strong>Kemahiran Tertinggi:</strong> {(selectedUserPrestasi.highestAbility * 100).toFixed(1)}%
+                </div>
               </div>
             </div>
           )}
