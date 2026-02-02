@@ -38,20 +38,42 @@ const healthCheck = async (req: express.Request, res: express.Response) => {
 };
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
 // Middleware
-app.use(cors()); //allows requests from any origin
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      process.env.FRONTEND_URL
+    ];
+
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,  // Allow credentials (cookies, authorization headers)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use(cookieParser());
-app.use("/api/auth", authRoutes);
-app.use("/api/announcements", announcementRoutes);
-app.use("/api/upkk", upkkRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/progress", progressRoutes);
-app.use("/api/lessons", lessonRoutes);
-app.use("/api", quizRoutes);
-app.use("/api/dashboard", dashboardRoutes);
+app.use("/auth", authRoutes);
+app.use("/announcements", announcementRoutes);
+app.use("/upkk", upkkRoutes);
+app.use("/users", userRoutes);
+app.use("/progress", progressRoutes);
+app.use("/lessons", lessonRoutes);
+app.use("/", quizRoutes);
+app.use("/dashboard", dashboardRoutes);
 
 // Basic route for testing
 app.get("/", async (req: Request, res: Response) => {
@@ -81,3 +103,7 @@ if (process.env.NODE_ENV === 'production') {
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
+
+//avoids issues when using secure cookies on Render.
+app.set('trust proxy', 1);
+

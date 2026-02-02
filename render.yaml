@@ -1,0 +1,41 @@
+services:
+  # Backend API Service
+  - type: web
+    name: mykafa-backend
+    runtime: node
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: npm start --prefix backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 18
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        fromService:
+          type: static
+          name: mykafa-frontend
+          property: host
+
+  # Frontend Static Site
+  - type: static
+    name: mykafa-frontend
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: mykafa-backend
+          property: host
+
+databases:
+  - name: mykafa-db
+    databaseName: mykafa
+    user: mykafa_user
+    plan: starter
