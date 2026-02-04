@@ -38,6 +38,7 @@ const healthCheck = async (req: express.Request, res: express.Response) => {
 };
 
 const app = express();
+app.set('trust proxy', 1); //avoids issues when using secure cookies on Render.
 const PORT = process.env.PORT || 10000;
 
 // Middleware
@@ -50,20 +51,23 @@ app.use(cors({
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:5173',
-      process.env.FRONTEND_URL
+      'https://mykafa-web-application.onrender.com',
+      'https://mykafa.com',
+      'https://www.mykafa.com',
     ];
 
 
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, false);
     }
   },
   credentials: true,  // Allow credentials (cookies, authorization headers)
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+app.options('*', cors());
 app.use(express.json());
 app.use(cookieParser());
 app.use("/auth", authRoutes);
@@ -92,18 +96,9 @@ app.get("/", async (req: Request, res: Response) => {
 // Database health check route
 app.get("/health/db", healthCheck);
 
-// SPA fallback - serve index.html for any non-API routes (only in production)
-if (process.env.NODE_ENV === 'production') {
-  app.use((req: Request, res: Response) => {
-    res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
-  });
-}
-
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
 
-//avoids issues when using secure cookies on Render.
-app.set('trust proxy', 1);
 
