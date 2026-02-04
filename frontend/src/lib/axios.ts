@@ -1,11 +1,13 @@
 import axios from 'axios';
 
-// Create a centralized Axios instance
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
-  timeout: 10000, // 10 seconds timeout
+  baseURL: import.meta.env.PROD
+    ? 'https://mykafa-backend.onrender.com'
+    : '/api',
+  timeout: 10000,
   withCredentials: true,
 });
+
 
 // Configure axios to include authentication token in all requests
 apiClient.interceptors.request.use(
