@@ -197,14 +197,13 @@ export const getStudentDashboard = async (req: AuthenticatedRequest, res: Respon
     const lessonHistoryQuery = `
       SELECT
         l.subject,
-        l.topic,
-        sp.completed_at,
+        l.title as topic,
+        sp.lesson_completed_at as completed_at,
         sp.lesson_completed
       FROM student_progress sp
-      JOIN lesson_materials lm ON sp.lesson_id = lm.id
-      JOIN lessons l ON lm.lesson_id = l.id
+      JOIN lessons l ON sp.lesson_id = l.id
       WHERE sp.user_id = $1 AND sp.lesson_completed = true
-      ORDER BY sp.completed_at DESC
+      ORDER BY sp.lesson_completed_at DESC
       LIMIT 10
     `;
     const lessonHistoryResult = await pool.query(lessonHistoryQuery, [userId]);
@@ -440,14 +439,13 @@ export const getStudentDashboardById = async (req: AuthenticatedRequest, res: Re
     const lessonHistoryQuery = `
       SELECT
         l.subject,
-        l.topic,
-        sp.completed_at,
+        l.title as topic,
+        sp.lesson_completed_at as completed_at,
         sp.lesson_completed
       FROM student_progress sp
-      JOIN lesson_materials lm ON sp.lesson_id = lm.id
-      JOIN lessons l ON lm.lesson_id = l.id
+      JOIN lessons l ON sp.lesson_id = l.id
       WHERE sp.user_id = $1 AND sp.lesson_completed = true
-      ORDER BY sp.completed_at DESC
+      ORDER BY sp.lesson_completed_at DESC
       LIMIT 10
     `;
     const lessonHistoryResult = await pool.query(lessonHistoryQuery, [user_id]);
