@@ -196,12 +196,13 @@ export const getStudentDashboard = async (req: AuthenticatedRequest, res: Respon
     // Get lesson completion history
     const lessonHistoryQuery = `
       SELECT
-        lm.subject,
-        lm.topic,
+        l.subject,
+        l.topic,
         sp.completed_at,
         sp.lesson_completed
       FROM student_progress sp
       JOIN lesson_materials lm ON sp.lesson_id = lm.id
+      JOIN lessons l ON lm.lesson_id = l.id
       WHERE sp.user_id = $1 AND sp.lesson_completed = true
       ORDER BY sp.completed_at DESC
       LIMIT 10
@@ -438,12 +439,13 @@ export const getStudentDashboardById = async (req: AuthenticatedRequest, res: Re
     // Get lesson completion history
     const lessonHistoryQuery = `
       SELECT
-        lm.subject,
-        lm.topic,
+        l.subject,
+        l.topic,
         sp.completed_at,
         sp.lesson_completed
       FROM student_progress sp
       JOIN lesson_materials lm ON sp.lesson_id = lm.id
+      JOIN lessons l ON lm.lesson_id = l.id
       WHERE sp.user_id = $1 AND sp.lesson_completed = true
       ORDER BY sp.completed_at DESC
       LIMIT 10
