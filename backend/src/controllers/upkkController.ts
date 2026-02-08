@@ -11,6 +11,7 @@ import {
   incrementDownloads,
 } from "../models/upkkModel";
 
+
 /**
  * GET /api/upkk - Get all UPKK papers
  */
@@ -266,7 +267,7 @@ export const archivePaperController = async (req: Request, res: Response) => {
       data: archivedPaper,
     });
   } catch (err: any) {
-    console.error("❌ Archive paper error:", err);
+    console.error("Archive paper error:", err);
     return res.status(500).json({
       success: false,
       message: "Ralat pelayan semasa mengarkib kertas soalan.",
@@ -310,7 +311,7 @@ export const viewPaper = async (req: Request, res: Response) => {
   return res.redirect(paper.file_path);
 
   } catch (err: any) {
-    console.error("❌ View paper error:", err);
+    console.error("View paper error:", err);
     return res.status(500).json({
       success: false,
       message: "Ralat pelayan semasa memuatkan kertas soalan.",
