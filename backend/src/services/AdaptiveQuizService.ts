@@ -408,7 +408,7 @@ export class AdaptiveQuizService {
         SELECT qq.id, question, options, correct_answers, hints, qq.topic, difficulty
         FROM quiz_questions qq
         JOIN quizzes q ON qq.quiz_id = q.id
-        WHERE q.year = $1 AND q.subject = $2 AND q.topic = $3
+        WHERE q.year = $1 AND q.subject = $2 AND q.topic = $3 AND q.status = 'published'
         ORDER BY qq.id
       `;
       const result = await pool.query(questionsQuery, [year, subject, topic]);
@@ -425,7 +425,7 @@ export class AdaptiveQuizService {
         SELECT qq.id, question, options, correct_answers, hints, qq.topic, difficulty
         FROM quiz_questions qq
         JOIN quizzes q ON qq.quiz_id = q.id
-        WHERE q.year = $1 AND q.subject = $2
+        WHERE q.year = $1 AND q.subject = $2 AND q.status = 'published'
         ORDER BY qq.id
       `;
       const result = await pool.query(questionsQuery, [year, subject]);

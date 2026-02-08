@@ -100,8 +100,14 @@ export const createPaperController = async (req: Request, res: Response) => {
     // Handle file upload
     let file_path = null;
     if (file) {
-      // For now, just store the filename. In production, you'd upload to cloud storage
-      file_path = file.filename || file.originalname;
+      // In production, you'd upload to cloud storage
+      let file_path = null;
+
+        if (file) {
+          // Cloudinary returns full URL here
+          file_path = file.path;
+        }
+
     }
 
     const newPaper = await createPaper({
@@ -306,22 +312,10 @@ export const viewPaper = async (req: Request, res: Response) => {
       });
     }
 
-    // Serve the file for viewing (inline in browser)
-    const filePath = `uploads/${paper.file_path}`;
 
-    // Set headers for inline viewing
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", "inline");
+  // Redirect browser to Cloudinary PDF (inline view)
+  return res.redirect(paper.file_path);
 
-    res.sendFile(filePath, { root: process.cwd() }, (err) => {
-      if (err) {
-        console.error("❌ File serving error:", err);
-        return res.status(500).json({
-          success: false,
-          message: "Ralat semasa memuatkan fail.",
-        });
-      }
-    });
   } catch (err: any) {
     console.error("❌ View paper error:", err);
     return res.status(500).json({
@@ -363,22 +357,16 @@ export const downloadPaper = async (req: Request, res: Response) => {
     }
 
     // Increment download count
-    await incrementDownloads(paperId);
+  await incrementDownloads(paperId);
 
-    // Serve the file for download
-    const filePath = `uploads/${paper.file_path}`;
-    const fileName = `Kertas_${paper.subject}_${paper.year}.pdf`;
+  // Redirect to Cloudinary with forced download
+  const downloadUrl = paper.file_path.replace(
+    "/upload/",
+    "/upload/fl_attachment/"
+  );
 
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-    res.sendFile(filePath, { root: process.cwd() }, (err) => {
-      if (err) {
-        console.error("❌ File download error:", err);
-        return res.status(500).json({
-          success: false,
-          message: "Ralat semasa memuat turun fail.",
-        });
-      }
-    });
+  return res.redirect(downloadUrl);
+
   } catch (err: any) {
     console.error("❌ Download paper error:", err);
     return res.status(500).json({
