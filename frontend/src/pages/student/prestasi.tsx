@@ -216,16 +216,16 @@ const Prestasi: React.FC = () => {
                 {dashboardData.weakAreas.map((area, index) => (
                   <div key={index} className="bg-white p-4 rounded-lg border-l-4 border-purple-500 shadow-md">
                     <h4 className="font-bold text-lg text-gray-900 mb-2">
-                      {area.subject} - {area.topic}
+                      {area.subject} : {area.topic}
                     </h4>
                     <p className="text-base text-gray-700 mb-2">{area.issue}</p>
-                    <p className="text-base text-purple-700 font-semibold">{area.recommendation} 💡</p>
+                    <p className="text-base text-purple-700 font-semibold">{area.recommendation}</p>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-xl font-bold text-green-600 mb-2">Kerja Hebat! 🎉</p>
+                <p className="text-xl font-bold text-green-600 mb-2">Prestasi Baik</p>
                 <p className="text-lg text-gray-600">Tiada Topik yang lemah dikenal pasti</p>
               </div>
             )}
