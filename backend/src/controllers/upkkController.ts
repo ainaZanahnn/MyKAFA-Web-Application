@@ -1,7 +1,6 @@
 /** @format */
 
 import { Request, Response } from "express";
-import multer from "multer";
 import {
   createPaper,
   getAllPapers,
@@ -97,17 +96,11 @@ export const createPaperController = async (req: Request, res: Response) => {
       });
     }
 
-    // Handle file upload
-    let file_path = null;
+    let file_path: string | null = null;
+
     if (file) {
-      // In production, you'd upload to cloud storage
-      let file_path = null;
-
-        if (file) {
-          // Cloudinary returns full URL here
-          file_path = file.path;
-        }
-
+      // Cloudinary returns full URL here
+      file_path = file.path;
     }
 
     const newPaper = await createPaper({
@@ -167,7 +160,7 @@ export const updatePaperController = async (req: Request, res: Response) => {
 
     // Handle file upload if provided
     if (file) {
-      updates.file_path = file.filename || file.originalname;
+      updates.file_path = file.path; // Cloudinary URL
     }
 
     const updatedPaper = await updatePaper(paperId, updates);

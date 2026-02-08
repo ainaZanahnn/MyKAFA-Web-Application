@@ -192,6 +192,8 @@ export const getQuizResults = async (req: Request, res: Response) => {
 export const getQuizProgress = async (req: Request, res: Response) => {
   const { userId, year, subject, topic } = req.params;
 
+  console.log(`[DEBUG] getQuizProgress called: userId=${userId}, year=${year}, subject=${subject}, topic="${topic}"`);
+
   try {
     // First, get the quiz_id from year, subject, topic with flexible matching
     let quizQuery = await pool.query(
@@ -207,11 +209,17 @@ export const getQuizProgress = async (req: Request, res: Response) => {
         [year, subject]
       );
 
+      console.log(`[DEBUG] Found ${allQuizzesQuery.rows.length} quizzes for year=${year}, subject=${subject}`);
+      allQuizzesQuery.rows.forEach(quiz => {
+        console.log(`[DEBUG] Available quiz: id=${quiz.id}, topic="${quiz.topic}"`);
+      });
+
       // Import isTopicMatch function
       const { isTopicMatch } = await import('../utils/adaptiveQuizUtils');
 
       // Find quiz with flexible topic matching
       for (const quiz of allQuizzesQuery.rows) {
+        console.log(`[DEBUG] Checking if "${quiz.topic}" matches "${topic}": ${isTopicMatch(quiz.topic, topic)}`);
         if (isTopicMatch(quiz.topic, topic)) {
           quizQuery = { rows: [{ id: quiz.id, topic: quiz.topic }] } as any;
           console.log(`[DEBUG] Found matching quiz ID ${quiz.id} with topic "${quiz.topic}"`);

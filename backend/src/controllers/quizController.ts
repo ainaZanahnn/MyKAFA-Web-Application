@@ -361,12 +361,34 @@ export const getQuizStatsForStudent = async (req: AuthenticatedRequest, res: Res
   }
 
   try {
-    // First, get the quiz_id from year, subject, topic
-    const quizQuery = `
-      SELECT id FROM quizzes WHERE year = $1 AND subject = $2 AND topic = $3
-    `;
-    const quizResult = await pool.query(quizQuery, [year, subject, topic]);
-    if (quizResult.rows.length === 0) {
+    // First, get the quiz_id from year, subject, topic with flexible matching
+    let quizQuery = await pool.query(
+      `SELECT id, topic FROM quizzes WHERE year = $1 AND subject = $2 AND topic = $3`,
+      [year, subject, topic]
+    );
+
+    // If exact match fails, try flexible topic matching
+    if (quizQuery.rows.length === 0) {
+      console.log(`[DEBUG] Exact topic match failed for "${topic}", trying flexible match...`);
+      const allQuizzesQuery = await pool.query(
+        `SELECT id, topic FROM quizzes WHERE year = $1 AND subject = $2`,
+        [year, subject]
+      );
+
+      // Import isTopicMatch function
+      const { isTopicMatch } = await import('../utils/adaptiveQuizUtils');
+
+      // Find quiz with flexible topic matching
+      for (const quiz of allQuizzesQuery.rows) {
+        if (isTopicMatch(quiz.topic, topic)) {
+          quizQuery = { rows: [{ id: quiz.id, topic: quiz.topic }] } as any;
+          console.log(`[DEBUG] Found matching quiz ID ${quiz.id} with topic "${quiz.topic}"`);
+          break;
+        }
+      }
+    }
+
+    if (quizQuery.rows.length === 0) {
       return res.json({
         stats: {
           totalAttempts: 0,
@@ -378,7 +400,7 @@ export const getQuizStatsForStudent = async (req: AuthenticatedRequest, res: Res
         success: true
       });
     }
-    const quizId = quizResult.rows[0].id;
+    const quizId = quizQuery.rows[0].id;
 
     // Get quiz statistics from student_quiz_progress
     const statsQuery = `
