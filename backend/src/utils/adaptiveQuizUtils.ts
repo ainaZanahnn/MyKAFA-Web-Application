@@ -91,14 +91,14 @@ export function selectNextQuestion(session: QuizSession): Question | null {
         getDifficultyScore(q.difficulty) >= targetDifficulty - 0.3
       );
 
-      if (candidates.length > 0) {
-        const selectedQuestion = candidates[Math.floor(Math.random() * candidates.length)];
-        // Mark this question as remedial in the quiz session
-        if (!session.remedialQuestions.includes(selectedQuestion.id)) {
-          session.remedialQuestions.push(selectedQuestion.id);
-        }
-        return selectedQuestion;
+    if (candidates.length > 0) {
+      const selectedQuestion = candidates[Math.floor(Math.random() * candidates.length)];
+      // Mark this question as remedial in the quiz session only if it's not from the current topic
+      if (!session.remedialQuestions.includes(selectedQuestion.id) && !isTopicMatch(selectedQuestion.topic, session.topic)) {
+        session.remedialQuestions.push(selectedQuestion.id);
       }
+      return selectedQuestion;
+    }
     }
   }
 

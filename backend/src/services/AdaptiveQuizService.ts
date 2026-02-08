@@ -597,6 +597,8 @@ export class AdaptiveQuizService {
            WHERE user_id = $6 AND quiz_id = $7`,
           [persistentPassed, score, newBestScore, newAttempts, now, userId, quizId]
         );
+
+        console.log(`[DEBUG] Updated quiz progress for user ${userId}, quiz ${quizId}: passed=${persistentPassed}, last_score=${score}, best_score=${newBestScore}, attempts=${newAttempts}`);
       } else {
         await pool.query(
           `INSERT INTO student_quiz_progress
@@ -604,6 +606,8 @@ export class AdaptiveQuizService {
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [userId, quizId, currentAttemptPassed, score, score, 1, now]
         );
+
+        console.log(`[DEBUG] Inserted new quiz progress for user ${userId}, quiz ${quizId}: passed=${currentAttemptPassed}, score=${score}`);
       }
     } catch (error) {
       console.error('Error recording quiz attempt:', error);
