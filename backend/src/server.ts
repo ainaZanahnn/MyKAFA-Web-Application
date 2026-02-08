@@ -16,6 +16,13 @@ import dashboardRoutes from './routes/dashboardRoutes';
 // Load environment variables
 dotenv.config();
 
+// TEMP LOG
+console.log("Cloudinary ENV check:", {
+  CLOUD_NAME: !!process.env.CLOUDINARY_CLOUD_NAME,
+  API_KEY: !!process.env.CLOUDINARY_API_KEY,
+  API_SECRET: !!process.env.CLOUDINARY_API_SECRET,
+});
+
 // Database health check endpoint
 const healthCheck = async (req: express.Request, res: express.Response) => {
   try {

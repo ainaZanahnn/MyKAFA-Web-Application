@@ -36,7 +36,7 @@ export default function ManagePapers() {
     subject: "",
     type: "",
     file: null as File | null,
-    status: "Aktif",
+    status: "aktif",
   });
 
   const [editingPaper, setEditingPaper] = useState<Paper | null>(null);
@@ -55,7 +55,7 @@ export default function ManagePapers() {
         setPapers((response.data || []).map(paper => ({
           ...paper,
           type: paper.type || '',
-          status: paper.status || 'Aktif',
+          status: paper.status || 'aktif',
           downloads: paper.downloads || 0,
         })));
       }
@@ -100,7 +100,7 @@ export default function ManagePapers() {
         const paperData = {
           ...response.data,
           type: response.data.type || '',
-          status: response.data.status || 'Aktif',
+          status: response.data.status || 'aktif',
           downloads: response.data.downloads || 0,
         };
         if (editingPaper) {
@@ -115,7 +115,7 @@ export default function ManagePapers() {
           subject: "",
           type: "",
           file: null,
-          status: "Aktif",
+          status: "aktif",
         });
         setEditingPaper(null);
         setShowModal(false);
@@ -149,7 +149,7 @@ export default function ManagePapers() {
       const response = await upkkService.archivePaper(id);
 
       if (response.success) {
-        setPapers(papers.map((p) => p.id === id ? { ...p, status: "Arkib" } : p));
+        setPapers(papers.map((p) => p.id === id ? { ...p, status: "arkib" } : p));
         alert("Kertas soalan berjaya diarkib!");
       }
     } catch (err: unknown) {
@@ -161,11 +161,11 @@ export default function ManagePapers() {
   const handleActivate = async (id: number) => {
     try {
       const formData = new FormData();
-      formData.append("status", "Aktif");
+      formData.append("status", "aktif");
       const response = await upkkService.updatePaper(id, formData);
 
       if (response.success) {
-        setPapers(papers.map((p) => p.id === id ? { ...p, status: "Aktif" } : p));
+        setPapers(papers.map((p) => p.id === id ? { ...p, status: "aktif" } : p));
         alert("Kertas soalan berjaya diaktifkan!");
       }
     } catch (err: unknown) {
@@ -419,7 +419,7 @@ export default function ManagePapers() {
                         >
                           Padam
                         </button>
-                        {paper.status === "Arkib" ? (
+                        {paper.status === "arkib" ? (
                           <button
                             onClick={() => {
                               handleActivate(paper.id);

@@ -109,7 +109,7 @@ export const createPaperController = async (req: Request, res: Response) => {
       subject,
       type,
       file_path: file_path || undefined,
-      status: status || "Active",
+      status: status || "aktif",
       downloads: 0,
     });
 
