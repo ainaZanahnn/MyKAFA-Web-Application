@@ -313,7 +313,7 @@ export const viewPaper = async (req: Request, res: Response) => {
       return res.redirect(paper.file_path);
     } else {
       // Serve local file for viewing
-      const filePath = path.resolve(paper.file_path);
+      const filePath = path.join(__dirname, '..', 'uploads', paper.file_path);
       return res.sendFile(filePath);
     }
 
@@ -370,7 +370,7 @@ export const downloadPaper = async (req: Request, res: Response) => {
       return res.redirect(downloadUrl);
     } else {
       // Serve local file for download
-      const filePath = path.resolve(paper.file_path);
+      const filePath = path.join(__dirname, '..', 'uploads', paper.file_path);
       const fileName = path.basename(paper.file_path);
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       return res.sendFile(filePath);
