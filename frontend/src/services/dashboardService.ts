@@ -136,7 +136,10 @@ class DashboardService {
         currentAbility: data.currentAbility || 0.5,
         highestAbility: data.highestAbility || 0.5,
         totalQuizAttempts: data.totalQuizAttempts || 0,
-        subjectYearAbilities: data.subjectYearAbilities || []
+        subjectYearAbilities: data.subjectYearAbilities || [],
+        quizHistory: data.quizHistory || [],
+        abilityProgression: data.abilityProgression || [],
+        lessonHistory: data.lessonHistory || []
       };
     } catch (error) {
       console.error('Error fetching student prestasi data:', error);
@@ -157,7 +160,10 @@ class DashboardService {
         currentAbility: 0.5,
         highestAbility: 0.5,
         totalQuizAttempts: 0,
-        subjectYearAbilities: []
+        subjectYearAbilities: [],
+        quizHistory: [],
+        abilityProgression: [],
+        lessonHistory: []
       };
     }
   }

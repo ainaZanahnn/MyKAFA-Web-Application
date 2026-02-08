@@ -448,11 +448,11 @@ export default function UserManagement() {
 
       {/* View Prestasi Dialog */}
       <Dialog open={isViewPrestasiOpen} onOpenChange={setIsViewPrestasiOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-7xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Prestasi Pelajar</DialogTitle>
-            <DialogDescription>
-              Lihat prestasi pembelajaran pelajar yang dipilih.
+            <DialogTitle className="text-2xl">Prestasi Pelajar - Laporan Terperinci</DialogTitle>
+            <DialogDescription className="text-base">
+              Analisis komprehensif prestasi pembelajaran pelajar yang dipilih.
             </DialogDescription>
           </DialogHeader>
           {selectedUser && selectedUserPrestasi && (
