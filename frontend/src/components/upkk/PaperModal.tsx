@@ -1,6 +1,8 @@
 /** @format */
 
+
 import { X, Download } from "lucide-react";
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface Paper {
   id: string;
@@ -52,9 +54,9 @@ const PaperModal: React.FC<PaperModalProps> = ({
         <div className="flex-1 overflow-hidden bg-gray-100">
           {paper.file_path ? (
             <iframe
-              src={`/api/upkk/${paper.id}/view`}
-              className="w-full h-full min-h-[600px] border-0"
-              title={`Preview ${paper.subject} ${paper.year}`}
+              src={`${API_URL}/upkk/${paper.id}/view`}
+              className="w-full h-full"
+              title="Preview PDF"
             />
           ) : (
             <div className="flex items-center justify-center h-full p-8">
