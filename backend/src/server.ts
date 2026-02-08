@@ -48,14 +48,8 @@ const app = express();
 app.set('trust proxy', 1); //avoids issues when using secure cookies on Render.
 const PORT = process.env.PORT || 10000;
 
-// Middleware
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
 
-
-    const allowedOrigins = [
+const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:5173',
       'https://mykafa-web-application.onrender.com',
@@ -63,13 +57,19 @@ app.use(cors({
       'https://www.mykafa.com',
     ];
 
+// Middleware
+app.use(cors({
+  origin: (origin, callback) => {
+      // Allow Postman, curl, server-to-server
+      if (!origin) return callback(null, true);
 
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(null, false);
-    }
-  },
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("CORS_NOT_ALLOWED"));
+    },
+    
   credentials: true,  // Allow credentials (cookies, authorization headers)
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
