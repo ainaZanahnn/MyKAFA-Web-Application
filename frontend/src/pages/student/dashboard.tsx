@@ -46,21 +46,21 @@ const Dashboard: React.FC = () => {
             <CardContent className="pt-6">
               <div className="space-y-4">
                 <div className="bg-white p-4 rounded-lg border-l-4 border-purple-500 shadow-md">
-                  <h4 className="font-bold text-lg text-gray-900 mb-2">🎯 Sistem Pembelajaran Adaptif</h4>
+                  <h4 className="font-bold text-lg text-gray-900 mb-2">Sistem Pembelajaran Adaptif</h4>
                   <p className="text-base text-gray-700 mb-2">
-                    MyKAFA menggunakan kaedah adaptif untuk menyesuaikan soalan mengikut tahap prestasi anda. Semakin banyak jawapan betul, soalan akan menjadi lebih mencabar.
+                    MyKAFA menggunakan kaedah adaptif untuk menyesuaikan tahap kesukaran soalan mengikut tahap prestasi.
                   </p>
                 </div>
                 <div className="bg-white p-4 rounded-lg border-l-4 border-purple-500 shadow-md">
-                  <h4 className="font-bold text-lg text-gray-900 mb-2">📊 Pengukuran Kemahiran</h4>
+                  <h4 className="font-bold text-lg text-gray-900 mb-2">Pengukuran Kemahiran</h4>
                   <p className="text-base text-gray-700 mb-2">
-                    MyKAFA mengukur tahap kemahiran anda secara berterusan. Tahap kemahiran serta presatasi anda akan menentukan tahap kesukaran soalan.
+                    MyKAFA mengukur tahap kemahiran secara berterusan.
                   </p>
                 </div>
                 <div className="bg-white p-4 rounded-lg border-l-4 border-purple-500 shadow-md">
-                  <h4 className="font-bold text-lg text-gray-900 mb-2">🏆 Sistem Mata dan Pencapaian</h4>
+                  <h4 className="font-bold text-lg text-gray-900 mb-2">Sistem Mata dan Pencapaian</h4>
                   <p className="text-base text-gray-700 mb-2">
-                    MyKAFA memberikan ganjaran apabila anda mencapai kemajuan. Mata diperoleh melalui kuiz dan aktiviti pembelajaran. 
+                    Mata diperoleh melalui kuiz dan aktiviti pembelajaran. 
                   </p>
                 </div>
               </div>
