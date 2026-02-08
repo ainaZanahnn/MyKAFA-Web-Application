@@ -4,21 +4,15 @@
 
 import { Pool } from "pg"; //pool allow  multiple clinets to connect
 import dotenv from "dotenv"; // dotenv loads .env
+
 dotenv.config();
 
 const pool = new Pool({
-  host: process.env.PGHOST,
-  port: Number(process.env.PGPORT),
-  database: process.env.PGDATABASE,
-  user: process.env.PGUSER,
-  password: process.env.PGPASSWORD,
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production"
+    ? { rejectUnauthorized: false }
+    : false,
 
-  //REQUIRED for Render PostgreSQL
-  ssl: {
-    rejectUnauthorized: false,
-  },
-
-  // Connection settings
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,
   max: 20,
@@ -32,7 +26,7 @@ pool.on('connect', (client) => {
 });
 
 pool.on('error', (err, client) => {
-  console.error('❌ Unexpected error on idle client:', err);
+  console.error('Unexpected error on idle client:', err);
   // Don't exit the process, just log the error
 });
 
@@ -43,7 +37,7 @@ const testConnection = async () => {
     console.log("✅ Connected to PostgreSQL successfully");
     client.release();
   } catch (err) {
-    console.error("❌ Database connection error:", err);
+    console.error("Database connection error:", err);
     // Don't exit process, let the application handle reconnection
   }
 };
