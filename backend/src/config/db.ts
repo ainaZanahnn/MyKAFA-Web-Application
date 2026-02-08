@@ -7,6 +7,8 @@ import dotenv from "dotenv"; // dotenv loads .env
 
 dotenv.config();
 
+console.log("DATABASE_URL exists:", !!process.env.DATABASE_URL);
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === "production"
@@ -17,7 +19,10 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
   max: 20,
   allowExitOnIdle: true,
+
 });
+
+console.log("DB HOST:", process.env.DATABASE_URL?.split("@")[1]);
 
 
 // Handle pool events
