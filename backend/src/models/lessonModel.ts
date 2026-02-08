@@ -11,7 +11,7 @@ export interface Lesson {
   title: string;
   description?: string;
   year_level: string;
-  status?: 'draft' | 'published' | 'archived';
+  status?: 'draf' | 'diterbitkan' | 'arkib';
   lesson_order: number;
   created_at?: Date;
   updated_at?: Date;
