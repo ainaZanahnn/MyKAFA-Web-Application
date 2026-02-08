@@ -100,7 +100,7 @@ export const getStudentDashboard = async (req: AuthenticatedRequest, res: Respon
     if (weakAreas.length === 0) {
       weakAreas.push(
         {
-          subject: 'Tiada Subject',
+          subject: '',
           topic: 'Tiada Kawasan Lemah Yang Dikenal Pasti',
           issue: '',
           recommendation: 'Mulakan kuiz untuk mengenal pasti kawasan yang perlu diperbaiki'
@@ -342,7 +342,7 @@ export const getStudentDashboardById = async (req: AuthenticatedRequest, res: Re
     if (weakAreas.length === 0) {
       weakAreas.push(
         {
-          subject: 'Tiada Subject',
+          subject: '',
           topic: 'Tiada Kawasan Lemah Yang Dikenal Pasti',
           issue: '',
           recommendation: 'Mulakan kuiz untuk mengenal pasti kawasan yang perlu diperbaiki'
